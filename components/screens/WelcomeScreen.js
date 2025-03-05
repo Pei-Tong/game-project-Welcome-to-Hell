@@ -12,11 +12,14 @@ import { GameEngine } from 'react-native-game-engine';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
 
 // Prevent the splash screen from auto-hiding until fonts are loaded
 SplashScreen.preventAutoHideAsync();
 
 export default function WelcomeScreen() {
+  const navigation = useNavigation();
+  
   // Load the secondary font from ../../assets/fonts/secondary-font.ttf
   const [fontsLoaded] = useFonts({
     secondary: require('../../assets/fonts/secondary-font.ttf'),
@@ -48,7 +51,7 @@ export default function WelcomeScreen() {
             style={styles.button} 
             onPress={() => {
               console.log('Go to GAME pressed');
-              // TODO: Navigate to game screen
+              navigation.navigate("MainScreen"); // Navigate to MainScreen.js
             }}
           >
             <Text style={styles.buttonText}>Go to GAME</Text>
@@ -86,16 +89,15 @@ export default function WelcomeScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Instructions</Text>
             <Text style={styles.modalText}>
-            How to Play:{'\n'}
-                •	Swipe to Move: Slide in the direction you want to go.{'\n'}
-                •	Avoid the Spikes: Jumping on spikes will cost you two lives (you start with 10 lives).{'\n'}
-                •	Regain Lives: Land on the regular platforms to regain one life.{'\n'}
-                •	Dodge Obstacles: Watch out for fireballs falling from above and devils’ horns coming from the sides.{'\n'}
-                •	Controls: Use the left and right buttons to navigate.{'\n'}
-                •	Scoring: Earn points every second as long as you’re alive.{'\n'}
-                <Text style={styles.emoji}></Text>☠ Warning: If you fall, you’re sent straight to Hell!{'\n'}
-                <Text style={styles.emoji}>👹</Text>Good luck—we hope you don’t make it!
- 
+              How to Play:{'\n'}
+              • Swipe to Move: Slide in the direction you want to go.{'\n'}
+              • Avoid the Spikes: Jumping on spikes will cost you two lives (you start with 10 lives).{'\n'}
+              • Regain Lives: Land on the regular platforms to regain one life.{'\n'}
+              • Dodge Obstacles: Watch out for fireballs falling from above and devils’ horns coming from the sides.{'\n'}
+              • Controls: Use the left and right buttons to navigate.{'\n'}
+              • Scoring: Earn points every second as long as you’re alive.{'\n'}
+              <Text style={styles.emoji}></Text>☠ Warning: If you fall, you’re sent straight to Hell!{'\n'}
+              <Text style={styles.emoji}>👹</Text>Good luck—we hope you don’t make it!
             </Text>
             <TouchableOpacity 
               style={styles.closeButton} 
@@ -200,7 +202,6 @@ const styles = StyleSheet.create({
   modalText: {
     fontFamily: 'secondary',
     fontSize: 19,
-    // textAlign: 'center',
     marginBottom: 20,
     fontWeight: '300',
     color: '#ffff00',
