@@ -11,7 +11,7 @@ export default function GameScreen({ route, navigation }) {
 
   return (
     <ImageBackground 
-      source={require('../../assets/img/Bg2.png')}
+      source={require('../../assets/img/bg2.png')}
       style={styles.background}
     >
       {/* Navigate Back Button */}
@@ -35,6 +35,6 @@ const styles = StyleSheet.create({
   },
   backArrowText: {
     fontSize: 28,
-    color: '#fff',
+    color: '#ffff00',
   },
 });
