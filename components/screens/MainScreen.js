@@ -50,7 +50,7 @@ export default function MainScreen() {
     }, [])
   );
 
-  // Simulate a loading process when PLAY is pressed
+  // Simulate a loading process when PLAY button is pressed
   useEffect(() => {
     let interval;
     if (isLoading) {
@@ -145,22 +145,20 @@ export default function MainScreen() {
           </View>
         )}
 
-        {/* Settings Modal with blurred background and red/black color scheme */}
+        {/* Settings Modal */}
         {showSettingsModal && (
-          <BlurView intensity={50} tint="dark" style={styles.blurContainer}>
-            <View style={[styles.modalContainer, styles.settingsModalContainer]}>
-              <View style={[styles.modalContent, styles.settingsModalContent]}>
-                <Text style={[styles.modalTitle, styles.settingsModalTitle]}>Settings</Text>
-                {/* Add your settings options here */}
-                <TouchableOpacity 
-                  style={styles.modalCloseButton} 
-                  onPress={() => setShowSettingsModal(false)}
-                >
-                  <Text style={[styles.modalCloseButtonText, styles.settingsModalCloseButtonText]}>Close</Text>
-                </TouchableOpacity>
-              </View>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Settings</Text>
+              {/* Add your settings options here */}
+              <TouchableOpacity 
+                style={styles.modalCloseButton} 
+                onPress={() => setShowSettingsModal(false)}
+              >
+                <Text style={styles.modalCloseButtonText}>Close</Text>
+              </TouchableOpacity>
             </View>
-          </BlurView>
+          </View>
         )}
 
         {/* Bottom Section */}
@@ -174,7 +172,6 @@ export default function MainScreen() {
               setIsLoading(true);
             }
           }}
-          disabled={!selectedPlayer || isLoading}
         >
           <Text style={styles.playButtonText}>PLAY</Text>
         </TouchableOpacity>
@@ -271,7 +268,6 @@ const styles = StyleSheet.create({
     borderColor: '#000',
     borderRadius: 5,
     marginTop: 60,
-    opacity: 0.5,
   },
   playButtonActive: {
     opacity: 1,
@@ -303,15 +299,20 @@ const styles = StyleSheet.create({
     color: '#fff000',
   },
   modalContainer: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.8)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 100,
   },
   modalContent: {
-    backgroundColor: '#fff',
-    width: '80%',
-    padding: 30,
+    backgroundColor: '#191919',
+    width: '50%',
+    padding: 30, 
     borderRadius: 10,
     alignItems: 'center',
   },
@@ -319,7 +320,7 @@ const styles = StyleSheet.create({
     fontFamily: 'secondary',
     fontSize: 24,
     marginBottom: 10,
-    color: '#000',
+    color: '#ffff00',
   },
   modalPlayerImage: {
     width: 200,
@@ -335,33 +336,6 @@ const styles = StyleSheet.create({
   modalCloseButtonText: {
     fontFamily: 'secondary',
     fontSize: 18,
-    color: '#fff',
-  },
-  blurContainer: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  settingsModalContainer: {
-  },
-  settingsModalContent: {
-    backgroundColor: '#000', 
-    width: '80%',
-    padding: 30,
-    borderRadius: 10,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#000', 
-  },
-  settingsModalTitle: {
-    fontFamily: 'secondary',
-    fontSize: 24,
-    marginBottom: 10,
-    color: '#fff000', 
-  },
-  settingsModalCloseButtonText: {
-    fontFamily: 'secondary',
-    fontSize: 18,
-    color: '#fff000',
+    color: '#ffff00',
   },
 });
