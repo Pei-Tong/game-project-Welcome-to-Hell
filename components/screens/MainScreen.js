@@ -58,8 +58,9 @@ export default function MainScreen() {
         setLoadingProgress((prev) => {
           if (prev >= 100) {
             clearInterval(interval);
-            // Navigate to GameScreen with selected player info when loading is complete
-            navigation.navigate('GameScreen', { selectedPlayer });
+            setTimeout(() => {
+              navigation.navigate('GameScreen', { selectedPlayer });
+            }, 0);
             return 100;
           }
           return prev + 10;

@@ -9,13 +9,16 @@ import {
 import { GameEngine } from 'react-native-game-engine';
 import Matter from 'matter-js';
 import createBoundaries from '../entities/Boundaries';
+import createPlatform from '../entities/Platform';
+import createSpike from '../entities/Spike';
 
 const { width, height } = Dimensions.get('window');
 
 // 簡單的物理更新系統
 const Physics = (entities, { time }) => {
   const engine = entities.physics.engine;
-  Matter.Engine.update(engine, time.delta);
+  const delta = Math.min(time.delta, 16.667);
+  Matter.Engine.update(engine, delta);
   return entities;
 };
 
@@ -28,13 +31,17 @@ export default function GameScreen({ route, navigation }) {
   const engine = Matter.Engine.create({ enableSleeping: false });
   const world = engine.world;
 
-  // 創建邊界
   const boundaries = createBoundaries(world);
+  const platform = createPlatform(world, width / 2, height - 200);
+  const spike = createSpike(world, width / 2, height - 230);
+
 
   // 定義遊戲實體
   const entities = {
     physics: { engine, world },
     ...boundaries, // 添加邊界實體
+    platform1: platform,
+    spike1: spike,
   };
 
 
