@@ -1,26 +1,52 @@
+import React from 'react';
+import { View, Image } from 'react-native';
 import Matter from 'matter-js';
-import RenderEntity from '../RenderEntity';
-import { Dimensions } from 'react-native';
 
-const { width } = Dimensions.get('window');
+const Spike = (world, x, y, options) => {
+  const spikeWidth = 100;
+  const spikeHeight = 50;
+  const spikeBody = Matter.Bodies.rectangle(x, y, spikeWidth, spikeHeight, {
+    isStatic: true,
+    label: 'spike',
+    ...options,
+  });
 
-const createSpike = (world, x, y) => {
-  const spike = Matter.Bodies.rectangle(
-    x, 
-    y, 
-    100,
-    20,
-    { isStatic: true, label: 'spike' }
-  );
-
-  Matter.World.add(world, spike);
+  Matter.World.add(world, spikeBody);
 
   return {
-    body: spike,
-    size: [100, 20],
-    color: 'red',
-    renderer: RenderEntity,
+    body: spikeBody,
+    renderer: SpikeRenderer,
   };
 };
 
-export default createSpike;
+const SpikeRenderer = (props) => {
+  const width = props.body.bounds.max.x - props.body.bounds.min.x;
+  const height = props.body.bounds.max.y - props.body.bounds.min.y;
+  const x = props.body.position.x - width / 2;
+  const y = props.body.position.y - height / 2;
+
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        left: x,
+        top: y,
+        width: width,
+        height: height,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Image
+        source={require('../../assets/img/Spikes.png')} // Updated image path
+        style={{
+          width: width,
+          height: height,
+          resizeMode: 'contain', // Adjust as needed (contain, cover, stretch)
+        }}
+      />
+    </View>
+  );
+};
+
+export default Spike;

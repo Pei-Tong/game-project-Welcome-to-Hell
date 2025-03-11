@@ -14,7 +14,7 @@ import createPlatform from '../entities/Platform';
 import createSpike from '../entities/Spike';
 import createSpring from '../entities/Spring';
 import createTreadmill from '../entities/Treadmill';
-import createPlayer from '../entities/Player';
+import createPlayer from '../entities/Player'; // Updated Player entity
 
 const { width, height } = Dimensions.get('window');
 
@@ -24,17 +24,14 @@ export default function GameScreen({ route, navigation }) {
   const [lives, setLives] = useState(10);
   const [entities, setEntities] = useState(null);
   
-  // Create engine ref
   const engineRef = useRef(null);
   const gameEngineRef = useRef(null);
 
-  // Log for debugging
   useEffect(() => {
     console.log('GameScreen route.params:', route?.params);
     console.log('Selected Player:', selectedPlayer);
   }, [route?.params, selectedPlayer]);
 
-  // Physics system
   const Physics = (entities, { time }) => {
     const engine = entities.physics?.engine;
     if (!engine) {
@@ -44,7 +41,6 @@ export default function GameScreen({ route, navigation }) {
     
     const delta = Math.min(time.delta, 16.667);
 
-    // Check spring collision
     if (entities.player1 && entities.spring1) {
       const playerBody = entities.player1.body;
       const springBody = entities.spring1.body;
@@ -57,7 +53,6 @@ export default function GameScreen({ route, navigation }) {
     return entities;
   };
 
-  // Initialize the game world
   useEffect(() => {
     const engine = Matter.Engine.create({ enableSleeping: false });
     engineRef.current = engine;
@@ -69,13 +64,12 @@ export default function GameScreen({ route, navigation }) {
     
     const world = engine.world;
     
-    // Create game entities
     const boundaries = createBoundaries(world);
     const platform = createPlatform(world, width / 2, height - 200);
     const spike = createSpike(world, width / 2, height - 230);
     const spring = createSpring(world, width / 2 - 100, height - 250);
     const treadmill = createTreadmill(world, width / 2 + 100, height - 180, -1);
-    const player = createPlayer(world, width / 2, height - 300);
+    const player = createPlayer(world, width / 2, height - 300, selectedPlayer); // Pass selectedPlayer
     
     const gameEntities = {
       physics: { engine, world },
@@ -93,9 +87,8 @@ export default function GameScreen({ route, navigation }) {
       Matter.World.clear(world);
       Matter.Engine.clear(engine);
     };
-  }, []);
+  }, [selectedPlayer]); // Re-run if selectedPlayer changes
 
-  // Set up collision detection
   useEffect(() => {
     const engine = engineRef.current;
     if (!engine) {
@@ -125,7 +118,6 @@ export default function GameScreen({ route, navigation }) {
     };
   }, []);
 
-  // Check lives and navigate back if needed
   useEffect(() => {
     if (lives <= 0) {
       navigation.navigate('MainScreen');
@@ -143,7 +135,7 @@ export default function GameScreen({ route, navigation }) {
     });
   };
 
-  if (!entities) return null; // Prevent render until entities are ready
+  if (!entities) return null;
 
   return (
     <ImageBackground 
@@ -188,7 +180,7 @@ const styles = StyleSheet.create({
   },
   gameContainer: {
     flex: 1,
-    zIndex: 1, // Ensure GameEngine is above the background
+    zIndex: 1,
   },
   livesText: {
     position: 'absolute',
