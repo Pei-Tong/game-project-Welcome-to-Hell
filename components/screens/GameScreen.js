@@ -1,51 +1,149 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   StyleSheet, 
   Text, 
   ImageBackground, 
   TouchableOpacity,
-  Dimensions
+  Dimensions,
+  View
 } from 'react-native';
 import { GameEngine } from 'react-native-game-engine';
 import Matter from 'matter-js';
 import createBoundaries from '../entities/Boundaries';
 import createPlatform from '../entities/Platform';
 import createSpike from '../entities/Spike';
+import createSpring from '../entities/Spring';
+import createTreadmill from '../entities/Treadmill';
+import createPlayer from '../entities/Player';
 
 const { width, height } = Dimensions.get('window');
 
-// 簡單的物理更新系統
-const Physics = (entities, { time }) => {
-  const engine = entities.physics.engine;
-  const delta = Math.min(time.delta, 16.667);
-  Matter.Engine.update(engine, delta);
-  return entities;
-};
-
-
-
 export default function GameScreen({ route, navigation }) {
-  const { selectedPlayer } = route.params; // if needed for game logic
+  // Safely handle route.params with a fallback
+  const selectedPlayer = route?.params?.selectedPlayer || 'DefaultPlayer';
+  const [lives, setLives] = useState(10);
+  const [entities, setEntities] = useState(null);
+  
+  // Create engine ref
+  const engineRef = useRef(null);
+  const gameEngineRef = useRef(null);
 
-  // 初始化 Matter.js 引擎和世界
-  const engine = Matter.Engine.create({ enableSleeping: false });
-  const world = engine.world;
+  // Log for debugging
+  useEffect(() => {
+    console.log('GameScreen route.params:', route?.params);
+    console.log('Selected Player:', selectedPlayer);
+  }, [route?.params, selectedPlayer]);
 
-  const boundaries = createBoundaries(world);
-  const platform = createPlatform(world, width / 2, height - 200);
-  const spike = createSpike(world, width / 2, height - 230);
+  // Physics system
+  const Physics = (entities, { time }) => {
+    const engine = entities.physics?.engine;
+    if (!engine) {
+      console.error('Physics system: Engine is undefined!');
+      return entities;
+    }
+    
+    const delta = Math.min(time.delta, 16.667);
 
+    // Check spring collision
+    if (entities.player1 && entities.spring1) {
+      const playerBody = entities.player1.body;
+      const springBody = entities.spring1.body;
+      if (Matter.Bounds.overlaps(playerBody.bounds, springBody.bounds)) {
+        Matter.Body.applyForce(playerBody, playerBody.position, { x: 0, y: -0.1 });
+      }
+    }
 
-  // 定義遊戲實體
-  const entities = {
-    physics: { engine, world },
-    ...boundaries, // 添加邊界實體
-    platform1: platform,
-    spike1: spike,
+    Matter.Engine.update(engine, delta);
+    return entities;
   };
 
+  // Initialize the game world
+  useEffect(() => {
+    const engine = Matter.Engine.create({ enableSleeping: false });
+    engineRef.current = engine;
+    
+    if (!engine) {
+      console.error('Engine creation failed!');
+      return;
+    }
+    
+    const world = engine.world;
+    
+    // Create game entities
+    const boundaries = createBoundaries(world);
+    const platform = createPlatform(world, width / 2, height - 200);
+    const spike = createSpike(world, width / 2, height - 230);
+    const spring = createSpring(world, width / 2 - 100, height - 250);
+    const treadmill = createTreadmill(world, width / 2 + 100, height - 180, -1);
+    const player = createPlayer(world, width / 2, height - 300);
+    
+    const gameEntities = {
+      physics: { engine, world },
+      ...boundaries,
+      platform1: platform || {},
+      spike1: spike || {},
+      spring1: spring || {},
+      treadmill1: treadmill || {},
+      player1: player || {},
+    };
+    
+    setEntities(gameEntities);
+    
+    return () => {
+      Matter.World.clear(world);
+      Matter.Engine.clear(engine);
+    };
+  }, []);
 
+  // Set up collision detection
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) {
+      console.error('Collision setup: Engine is undefined!');
+      return;
+    }
+    
+    const collisionHandler = (event) => {
+      if (!event || !event.pairs) {
+        console.error('Event or event.pairs is undefined!');
+        return;
+      }
+      
+      event.pairs.forEach((pair) => {
+        const { bodyA, bodyB } = pair;
+        if ((bodyA.label === 'player' && bodyB.label === 'spike') ||
+            (bodyA.label === 'spike' && bodyB.label === 'player')) {
+          setLives((prev) => Math.max(0, prev - 2));
+        }
+      });
+    };
+    
+    Matter.Events.on(engine, 'collisionStart', collisionHandler);
+    
+    return () => {
+      Matter.Events.off(engine, 'collisionStart', collisionHandler);
+    };
+  }, []);
 
+  // Check lives and navigate back if needed
+  useEffect(() => {
+    if (lives <= 0) {
+      navigation.navigate('MainScreen');
+    }
+  }, [lives, navigation]);
+
+  const movePlayer = (direction) => {
+    if (!entities || !entities.player1 || !entities.player1.body) return;
+    
+    const playerBody = entities.player1.body;
+    const speed = 5;
+    Matter.Body.setVelocity(playerBody, {
+      x: direction * speed,
+      y: playerBody.velocity.y,
+    });
+  };
+
+  if (!entities) return null; // Prevent render until entities are ready
 
   return (
     <ImageBackground 
@@ -53,14 +151,31 @@ export default function GameScreen({ route, navigation }) {
       style={styles.background}
     >
       <GameEngine 
+        ref={gameEngineRef}
         style={styles.gameContainer}
-        systems={[Physics]} // 添加物理更新系統
+        systems={[Physics]}
         entities={entities}
+        running={true}
       >
-        {/* Navigate Back Button */}
+        <Text style={styles.livesText}>Lives: {lives}</Text>
+        <Text style={styles.playerText}>Player: {selectedPlayer}</Text>
         <TouchableOpacity style={styles.backArrow} onPress={() => navigation.goBack()}>
           <Text style={styles.backArrowText}>←</Text>
         </TouchableOpacity>
+        <View style={styles.controls}>
+          <TouchableOpacity
+            style={styles.controlButton}
+            onPress={() => movePlayer(-1)}
+          >
+            <Text style={styles.controlText}>←</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.controlButton}
+            onPress={() => movePlayer(1)}
+          >
+            <Text style={styles.controlText}>→</Text>
+          </TouchableOpacity>
+        </View>
       </GameEngine>
     </ImageBackground>
   );
@@ -73,11 +188,21 @@ const styles = StyleSheet.create({
   },
   gameContainer: {
     flex: 1,
+    zIndex: 1, // Ensure GameEngine is above the background
+  },
+  livesText: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 20,
+    left: 20,
+    fontSize: 20,
+    color: '#ffff00',
+  },
+  playerText: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    fontSize: 20,
+    color: '#ffff00',
   },
   backArrow: {
     position: 'absolute',
@@ -87,6 +212,22 @@ const styles = StyleSheet.create({
   },
   backArrowText: {
     fontSize: 28,
+    color: '#ffff00',
+  },
+  controls: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    flexDirection: 'row',
+  },
+  controlButton: {
+    backgroundColor: '#930606',
+    padding: 10,
+    marginHorizontal: 5,
+    borderRadius: 5,
+  },
+  controlText: {
+    fontSize: 24,
     color: '#ffff00',
   },
 });
