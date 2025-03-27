@@ -229,6 +229,7 @@ export default function GameScreen({ route, navigation }) {
         let onSpikesNow = false;
         let onTreadmillNow = false;
         let treadmillSpeed = 0;
+        let currentPlatformBody = null;
         
         // Reset treadmill contact flag and speed
         treadmillContacted = false;
@@ -252,7 +253,21 @@ export default function GameScreen({ route, navigation }) {
           
           // If player's bottom is close to platform's top and there is sufficient overlap
           const verticalDistance = Math.abs(playerBottom - platformTop);
-          if (verticalDistance <= 8 && overlapRatio >= 0.3) { // Increased tolerance to 8
+          const isPenetrating = playerBottom > platformTop && playerBottom < platformBottom;
+          
+          if ((verticalDistance <= 8 && overlapRatio >= 0.3) || isPenetrating) { // Detect both close proximity and penetration
+            // If penetrating, correct position
+            if (isPenetrating) {
+              console.log("Correcting player position - platform penetration detected");
+              Matter.Body.setPosition(playerBody, {
+                x: playerBody.position.x,
+                y: platformTop - playerHeight/2 - 1 // Position 1px above platform
+              });
+            }
+            
+            // Store current platform for reference
+            currentPlatformBody = platformBody;
+            
             // Check platform type
             if (platformBody.label === 'platform') {
               onPlatformNow = true;
@@ -284,10 +299,10 @@ export default function GameScreen({ route, navigation }) {
           handleTreadmillEffect(treadmillSpeed);
         }
         
-        return { isOnPlatform, currentPlatformType };
+        return { isOnPlatform, currentPlatformType, currentPlatformBody };
       };
 
-      const { isOnPlatform, currentPlatformType } = checkPlatformContact();
+      const { isOnPlatform, currentPlatformType, currentPlatformBody } = checkPlatformContact();
 
       // Allow movement on any platform, including spike
       if (isOnPlatform) {
@@ -514,6 +529,17 @@ export default function GameScreen({ route, navigation }) {
           
           console.log('Player collision with spring started!');
           
+          // First ensure player is properly positioned on top of the spring
+          // to prevent penetration
+          const springTop = springBody.bounds.min.y;
+          const playerHeight = playerBody.bounds.max.y - playerBody.bounds.min.y;
+          
+          // Position player precisely on top of spring
+          Matter.Body.setPosition(playerBody, {
+            x: playerBody.position.x,
+            y: springTop - playerHeight/2 - 1 // 1 pixel above spring surface
+          });
+          
           // Only apply spring effect if player is moving downward or stationary
           if (playerBody.velocity.y >= 0) {
             // Strong upward bounce but with slower velocity
@@ -584,21 +610,27 @@ export default function GameScreen({ route, navigation }) {
           Matter.Body.setPosition(playerBody, {
             x: playerBody.position.x,
             y: spikeBody.position.y - (spikeBody.bounds.max.y - spikeBody.bounds.min.y) / 2 - 
-               (playerBody.bounds.max.y - playerBody.bounds.min.y) / 2 + 5
+               (playerBody.bounds.max.y - playerBody.bounds.min.y) / 2 + 2 // Reduced from 5 to 2 for exact positioning
           });
           
-          // Increase player mass for more stability, and reduce elasticity
+          // Increase player mass for more stability, and completely eliminate elasticity
           const originalMass = playerBody.mass;
-          Matter.Body.setMass(playerBody, originalMass * 5);
+          Matter.Body.setMass(playerBody, originalMass * 10); // Increased from 5 to 10 for extreme stability
           playerBody.restitution = 0;  // Remove elasticity
           
           // Set a flag to prevent continuous damage
           playerBody.isTouchingSpike = true;
           
           // Set appropriate friction to prevent abnormally slow falling
-          Matter.Body.set(playerBody, 'friction', 0);  // Completely remove friction
-          Matter.Body.set(playerBody, 'frictionAir', 0); // Ensure no air resistance
-          Matter.Body.set(playerBody, 'density', 1.5);  // Increased density for faster falling
+          Matter.Body.set(playerBody, 'friction', 1);  // Maximum friction
+          Matter.Body.set(playerBody, 'frictionAir', 0.1); // Slight air resistance
+          Matter.Body.set(playerBody, 'density', 2.0);  // Very high density
+          
+          // Disable all physics updates for this body temporarily
+          playerBody.isStatic = true;
+          setTimeout(() => {
+            if (playerBody) playerBody.isStatic = false;
+          }, 500);
           
           // Add special handling function to prevent bouncing
           const preventBounce = () => {
@@ -610,7 +642,7 @@ export default function GameScreen({ route, navigation }) {
           // Establish bounce detection interval
           const bounceInterval = setInterval(preventBounce, 16);
           
-          // Reset state after 5 seconds
+          // Reset state after 3 seconds
           setTimeout(() => {
             if (playerBody) {
               // Stop bounce detection
@@ -623,9 +655,9 @@ export default function GameScreen({ route, navigation }) {
               playerBody.isTouchingSpike = false;
               
               // Ensure player can fall normally - reset all properties that might affect falling
-              Matter.Body.set(playerBody, 'frictionAir', 0);
-              Matter.Body.set(playerBody, 'friction', 0); // Completely remove friction
-              Matter.Body.set(playerBody, 'density', 1.5); // Increased density for faster falling
+              Matter.Body.set(playerBody, 'frictionAir', 0.01);
+              Matter.Body.set(playerBody, 'friction', 0.3); // Restore normal friction
+              Matter.Body.set(playerBody, 'density', 1.5); // Normal density
               
               // Give initial downward velocity
               Matter.Body.setVelocity(playerBody, {

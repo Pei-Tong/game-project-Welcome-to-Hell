@@ -8,10 +8,20 @@ const Spike = (world, x, y, options) => {
   const spikeBody = Matter.Bodies.rectangle(x, y, spikeWidth, spikeHeight, {
     isStatic: true,
     label: 'spike',
+    restitution: 0,      // No bounce at all
+    friction: 1.0,       // Maximum friction to stop sliding
+    slop: 0,             // No slop for precise contact
+    density: 1000,       // Very high density to feel solid
+    collisionFilter: {
+      category: 0x0002,
+      mask: 0xFFFFFFFF
+    },
     ...options,
   });
 
   Matter.World.add(world, spikeBody);
+
+  console.log(`Creating spike at position (${x}, ${y})`);
 
   return {
     body: spikeBody,
@@ -19,31 +29,25 @@ const Spike = (world, x, y, options) => {
   };
 };
 
-const SpikeRenderer = (props) => {
-  const width = props.body.bounds.max.x - props.body.bounds.min.x;
-  const height = props.body.bounds.max.y - props.body.bounds.min.y;
-  const x = props.body.position.x - width / 2;
-  const y = props.body.position.y - height / 2;
-
+// Spike renderer component using image
+const SpikeRenderer = ({ body }) => {
+  const { position } = body;
+  // Adjust style based on body position
   return (
     <View
       style={{
-        position: 'absolute',
-        left: x,
-        top: y,
-        width: width,
-        height: height,
-        alignItems: 'center',
-        justifyContent: 'center',
+        position: "absolute",
+        left: position.x - 50, // Center horizontally
+        top: position.y - 25,  // Center vertically
+        width: 100,
+        height: 50,
+        backgroundColor: 'transparent',
+        overflow: 'hidden',
       }}
     >
       <Image
-        source={require('../../assets/img/Spikes.png')} // Updated image path
-        style={{
-          width: width,
-          height: height,
-          resizeMode: 'contain', // Adjust as needed (contain, cover, stretch)
-        }}
+        source={require('../../assets/img/Spikes.png')}
+        style={{ width: 100, height: 50, resizeMode: 'contain' }}
       />
     </View>
   );
