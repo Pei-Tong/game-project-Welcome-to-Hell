@@ -13,10 +13,10 @@ const createSpring = (world, x, y) => {
     { 
       isStatic: true, 
       label: 'spring',
-      restitution: 1.5,  // High restitution for spring effect
-      friction: 0.1,     // Low friction
-      density: 0.1,      // Light density
-      springStrength: 0.05, // Custom property for spring strength
+      restitution: 1.0,  // Reduced from 1.5 to 1.0 for smoother effect
+      friction: 0.05,    // Reduced from 0.1 to 0.05 for smoother landing
+      density: 0.05,     // Reduced from 0.1 to 0.05 for lighter feel
+      springStrength: 0.03, // Reduced from 0.05 to 0.03 for gentler effect
       chamfer: { radius: 0 }, // Ensure sharp corners
       collisionFilter: {
         category: 0x0002,
@@ -27,7 +27,7 @@ const createSpring = (world, x, y) => {
 
   Matter.World.add(world, spring);
 
-  console.log(`Creating spring at position (${x}, ${y}), with high bounce effect`);
+  console.log(`Creating spring at position (${x}, ${y}), with smoother bounce effect`);
 
   return {
     body: spring,

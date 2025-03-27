@@ -482,7 +482,7 @@ export default function GameScreen({ route, navigation }) {
             const treadmillTop = treadmillBody.bounds.min.y;
             Matter.Body.setPosition(playerBody, {
               x: playerBody.position.x,
-              y: treadmillTop - (playerBody.bounds.max.y - playerBody.bounds.min.y) / 2 - 2  // Move up slightly to prevent penetration
+              y: treadmillTop - (playerBody.bounds.max.y - playerBody.bounds.min.y) / 2 - 1  // Reduce the gap to just 1 for smoother contact
             });
             playerBody.hasSetInitialTreadmillPosition = true;
             
@@ -500,6 +500,10 @@ export default function GameScreen({ route, navigation }) {
           
           // Set player restitution coefficient to 0
           playerBody.restitution = 0;
+          
+          // Reduce friction to allow smooth sliding on treadmill
+          playerBody.friction = 0.01;
+          playerBody.frictionAir = 0.001;
         }
         
         // Handle the spring effect
@@ -512,10 +516,17 @@ export default function GameScreen({ route, navigation }) {
           
           // Only apply spring effect if player is moving downward or stationary
           if (playerBody.velocity.y >= 0) {
-            // Strong upward bounce
+            // Strong upward bounce but with slower velocity
+            // Reduce vertical velocity for smoother jump
             Matter.Body.setVelocity(playerBody, {
-              x: playerBody.velocity.x,
-              y: -18  // Very strong upward bounce
+              x: playerBody.velocity.x * 0.8, // Reduce horizontal momentum slightly
+              y: -12  // Reduced from -18 to -12 for slower but still high bounce
+            });
+            
+            // Apply additional upward force for height but not speed
+            Matter.Body.applyForce(playerBody, playerBody.position, {
+              x: 0,
+              y: -0.02 // Gentle upward force for height
             });
             
             // Increase lives if below 10 (no cooldown for spring healing)
@@ -526,7 +537,7 @@ export default function GameScreen({ route, navigation }) {
           }
           
           // Set player properties for better spring effect
-          playerBody.restitution = 0.8;  // Add some elasticity for spring
+          playerBody.restitution = 0.5;  // Reduced from 0.8 to 0.5 for smoother bouncing
           
           console.log(`Spring applied velocity: ${JSON.stringify(playerBody.velocity)}`);
         }
@@ -783,7 +794,10 @@ export default function GameScreen({ route, navigation }) {
       
       if (Math.sign(currentVelX) === Math.sign(direction)) {
         // Same direction, increase speed, but set upper limit
-        targetVelX = Math.min(Math.abs(currentVelX) + 2, 10) * direction;
+        // If holding key, accelerate faster (up to 15)
+        const maxSpeed = isHoldingLeft || isHoldingRight ? 15 : 10;
+        targetVelX = Math.min(Math.abs(currentVelX) + 2.5, maxSpeed) * direction;
+        console.log(`Accelerating player, direction: ${direction}, new speed: ${targetVelX}`);
       } else {
         // Different direction, set initial speed
         targetVelX = direction * 4;
@@ -921,18 +935,25 @@ export default function GameScreen({ route, navigation }) {
           const relativePosition = playerBottom - treadmillTop;
           
           // If relative position indicates possible penetration or sliding down, correct position
-          if (relativePosition > 5 || playerBody.velocity.y > 0) {
-            console.log("Preventing penetration: repositioning player on treadmill");
+          // Only reposition if the player is seriously penetrating (>3 pixels) to avoid jitter
+          if (relativePosition > 3 || playerBody.velocity.y > 0.5) {
+            console.log("Correcting treadmill position - penetration detected");
+            
+            // Smoothly adjust position to avoid sudden jumps
+            const adjustment = Math.min(relativePosition, 3); // Limit adjustment to 3px max per frame
             
             Matter.Body.setPosition(playerBody, {
               x: playerBody.position.x,
-              y: treadmillTop - (playerBody.bounds.max.y - playerBody.bounds.min.y) / 2 - 2
+              y: playerBody.position.y - adjustment
             });
             
-            Matter.Body.setVelocity(playerBody, {
-              x: playerBody.velocity.x,
-              y: 0
-            });
+            // Gently reset vertical velocity to avoid bouncing
+            if (playerBody.velocity.y > 0) {
+              Matter.Body.setVelocity(playerBody, {
+                x: playerBody.velocity.x,
+                y: 0
+              });
+            }
           }
         }
       }
@@ -950,34 +971,29 @@ export default function GameScreen({ route, navigation }) {
     if (playerBody) {
       console.log(`Applying treadmill effect with speed ${speed}. Current player velocity: ${JSON.stringify(playerBody.velocity)}`);
       
-      // Directly apply treadmill effect regardless of player's current state
-      // This ensures the effect is always applied
+      // Smooth treadmill effect to prevent bouncing
+      // Instead of applying force, we'll set velocity directly for smoother movement
       
-      // Set horizontal velocity directly based on treadmill speed
-      const treadmillForceX = speed * 0.01; // Convert speed to appropriate force magnitude
+      // Calculate current horizontal velocity plus treadmill influence
+      const currentVelX = playerBody.velocity.x;
+      const treadmillInfluence = speed * 0.2; // Smooth treadmill influence
       
-      // Apply force in direction of treadmill movement
-      Matter.Body.applyForce(playerBody, playerBody.position, {
-        x: treadmillForceX,
-        y: 0
-      });
+      // Smoothly interpolate between current velocity and target velocity
+      let targetVelocityX = currentVelX + treadmillInfluence;
       
-      // If player was stationary, give them an initial push
-      if (Math.abs(playerBody.velocity.x) < 0.1) {
-        Matter.Body.setVelocity(playerBody, {
-          x: speed * 0.5, // Give initial velocity in treadmill direction
-          y: playerBody.velocity.y
-        });
-        console.log(`Applied initial treadmill velocity: ${speed * 0.5}`);
+      // Cap the maximum velocity to prevent excessive speed
+      const maxTreadmillSpeed = Math.abs(speed) * 1.2;
+      if (Math.abs(targetVelocityX) > maxTreadmillSpeed) {
+        targetVelocityX = Math.sign(targetVelocityX) * maxTreadmillSpeed;
       }
       
-      // Ensure vertical velocity is zero to prevent bouncing
+      // Apply the new velocity
       Matter.Body.setVelocity(playerBody, {
-        x: playerBody.velocity.x,
-        y: 0
+        x: targetVelocityX,
+        y: 0 // Keep vertical velocity at 0 to prevent bouncing
       });
       
-      console.log(`After treadmill effect, player velocity: ${JSON.stringify(playerBody.velocity)}`);
+      console.log(`Applied smooth treadmill effect, new velocity: ${targetVelocityX}`);
     }
   };
 
