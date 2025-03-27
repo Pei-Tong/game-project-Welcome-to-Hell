@@ -175,10 +175,10 @@ export default function GameScreen({ route, navigation }) {
       if (playerBody.position.y > height + 100) {
         setGameOver(true);
         Alert.alert(
-          "遊戲結束",
-          `你的得分是: ${score}`,
+          "Game Over",
+          `Your score: ${score}`,
           [
-            { text: "返回主選單", onPress: () => navigation.navigate('MainScreen') }
+            { text: "Return to Main Menu", onPress: () => navigation.navigate('MainScreen') }
           ]
         );
         return entities;
@@ -648,10 +648,10 @@ export default function GameScreen({ route, navigation }) {
             if (newLives <= 0 && !gameOver) {
               setGameOver(true);
               Alert.alert(
-                "遊戲結束",
-                `你失去了所有生命！\n你的得分是: ${score}`,
+                "Game Over",
+                `You lose, welcome to hell!`,
                 [
-                  { text: "返回主選單", onPress: () => navigation.navigate('MainScreen') }
+                  { text: "Return to Main Menu", onPress: () => navigation.navigate('MainScreen') }
                 ]
               );
             }
@@ -724,10 +724,10 @@ export default function GameScreen({ route, navigation }) {
               if (newLives <= 0 && !gameOver) {
                 setGameOver(true);
                 Alert.alert(
-                  "遊戲結束",
-                  `你失去了所有生命！\n你的得分是: ${score}`,
+                  "Game Over",
+                  `Your score: ${score}`,
                   [
-                    { text: "返回主選單", onPress: () => navigation.navigate('MainScreen') }
+                    { text: "Return to Main Menu", onPress: () => navigation.navigate('MainScreen') }
                   ]
                 );
               }
@@ -766,10 +766,10 @@ export default function GameScreen({ route, navigation }) {
               if (newLives <= 0 && !gameOver) {
                 setGameOver(true);
                 Alert.alert(
-                  "遊戲結束",
-                  `你失去了所有生命！\n你的得分是: ${score}`,
+                  "Game Over",
+                  `Your score: ${score}`,
                   [
-                    { text: "返回主選單", onPress: () => navigation.navigate('MainScreen') }
+                    { text: "Return to Main Menu", onPress: () => navigation.navigate('MainScreen') }
                   ]
                 );
               }
