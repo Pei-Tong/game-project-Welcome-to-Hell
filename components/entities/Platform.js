@@ -12,10 +12,10 @@ const createPlatform = (world, posX, posY) => {
     20, 
     { 
       isStatic: true,
-      friction: 1,  // 增加摩擦力，防止玩家滑動
-      restitution: 0,  // 完全去除彈性
-      slop: 0,  // 減少物體重疊的處理閾值，設為0以獲得更精確的碰撞
-      label: 'platform'  // 確保平台有正確的標籤
+      friction: 1,  // Increase friction to prevent player sliding
+      restitution: 0,  // Completely remove elasticity
+      slop: 0,  // Set collision threshold to 0 for precise contact
+      label: 'platform'  // Ensure platform has the correct label
     }
   );
 
@@ -26,7 +26,7 @@ const createPlatform = (world, posX, posY) => {
     size: [100, 20],
     color: 'grey',
     renderer: RenderEntity,
-    label: 'platform'  // 確保實體對象也有標籤
+    label: 'platform'  // Ensure entity object also has label
   };
 };
 
