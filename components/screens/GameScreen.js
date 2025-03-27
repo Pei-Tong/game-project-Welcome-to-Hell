@@ -19,14 +19,14 @@ import createPlayer from '../entities/Player';
 
 const { width, height } = Dimensions.get('window');
 
-// 遊戲常數
-const SCROLL_SPEED = -1.8;        // 加快卷軸速度，從-1.0增加到-1.8
-const PLATFORM_GAP_MIN = 70;      // 平台間最小垂直間距
-const PLATFORM_GAP_MAX = 170;     // 平台間最大垂直間距
-const PLATFORM_WIDTH = 100;       // 平台寬度
-const INITIAL_PLATFORMS = 8;      // 初始平台數量
-const PLATFORM_TYPES = ['platform', 'treadmill', 'spring', 'spike']; // 平台類型
-const PLATFORM_WEIGHTS = [40, 25, 20, 15]; // 各類型平台的生成權重，確保更均衡的分佈
+// Game constants
+const SCROLL_SPEED = -1.8;        // Increased scroll speed from -1.0 to -1.8
+const PLATFORM_GAP_MIN = 70;      // Minimum vertical gap between platforms
+const PLATFORM_GAP_MAX = 170;     // Maximum vertical gap between platforms
+const PLATFORM_WIDTH = 100;       // Platform width
+const INITIAL_PLATFORMS = 8;      // Initial number of platforms
+const PLATFORM_TYPES = ['platform', 'treadmill', 'spring', 'spike']; // Platform types
+const PLATFORM_WEIGHTS = [40, 25, 20, 15]; // Weights for each platform type generation, for more balanced distribution
 
 export default function GameScreen({ route, navigation }) {
   const selectedPlayer = route?.params?.selectedPlayer || 'DefaultPlayer';
@@ -37,19 +37,25 @@ export default function GameScreen({ route, navigation }) {
   const [lastDamageTime, setLastDamageTime] = useState(0);
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);  // 添加暫停狀態
+  const [isPaused, setIsPaused] = useState(false);  // Added pause state
   
   const engineRef = useRef(null);
   const gameEngineRef = useRef(null);
   const platformsRef = useRef({});
   const scrollPositionRef = useRef(0);
-  const lowestPlatformRef = useRef(0);  // 從最高平台改為最低平台
-  const lastScoreUpdateRef = useRef(Date.now());  // 用於計算分數的時間參考
+  const lowestPlatformRef = useRef(0);  // Changed from highest platform to lowest platform
+  const lastScoreUpdateRef = useRef(Date.now());  // Used for score calculation time reference
+  
+  // Add refs for treadmill state
+  const treadmillContactedRef = useRef(false);
+  const currentTreadmillSpeedRef = useRef(0);
+  const [treadmillContacted, setTreadmillContacted] = useState(false);
+  const [currentTreadmillSpeed, setCurrentTreadmillSpeed] = useState(0);
 
-  // 處理暫停/繼續遊戲
+  // Handle pause/resume game
   const togglePause = () => {
     setIsPaused(!isPaused);
-    console.log('遊戲狀態:', isPaused ? '繼續' : '暫停');
+    console.log('Game state:', isPaused ? 'Resume' : 'Pause');
   };
 
   useEffect(() => {
@@ -57,7 +63,7 @@ export default function GameScreen({ route, navigation }) {
     console.log('Selected Player:', selectedPlayer);
   }, [route?.params, selectedPlayer]);
 
-  // 產生隨機平台類型
+  // Generate random platform type
   const getRandomPlatformType = () => {
     const totalWeight = PLATFORM_WEIGHTS.reduce((a, b) => a + b, 0);
     let random = Math.random() * totalWeight;
@@ -68,12 +74,12 @@ export default function GameScreen({ route, navigation }) {
       }
       random -= PLATFORM_WEIGHTS[i];
     }
-    return 'platform';  // 預設平台類型
+    return 'platform';  // Default platform type
   };
   
-  // 創建一個新平台
+  // Create a new platform
   const createRandomPlatform = (world, y, isInitial = false) => {
-    // 初始平台應該更穩定，不包含 spike
+    // Initial platforms should be more stable, not containing spike
     const platformType = isInitial 
       ? (Math.random() < 0.7 ? 'platform' : (Math.random() < 0.5 ? 'treadmill' : 'spring'))
       : getRandomPlatformType();
@@ -83,37 +89,37 @@ export default function GameScreen({ route, navigation }) {
     let platform;
     switch (platformType) {
       case 'treadmill':
-        const direction = Math.random() < 0.5 ? -2 : 2;  // 增加速度大小，從±1增加到±2
+        const direction = Math.random() < 0.5 ? -2 : 2;  // Increased speed size, from ±1 to ±2
         platform = createTreadmill(world, x, y, direction);
-        // 確保跑步機有正確的標籤
+        // Ensure treadmill has correct label
         platform.body.label = 'treadmill';
-        console.log("建立跑步機，速度:", direction, "顏色:", platform.color);
+        console.log("Created treadmill, speed:", direction, "Color:", platform.color);
         break;
       case 'spring':
         platform = createSpring(world, x, y);
-        // 確保彈簧有正確的標籤
+        // Ensure spring has correct label
         platform.body.label = 'spring';
-        console.log("建立彈簧，顏色:", platform.color);
+        console.log("Created spring, color:", platform.color);
         break;
       case 'spike':
         platform = createSpike(world, x, y);
-        // 確保尖刺有正確的標籤
+        // Ensure spike has correct label
         platform.body.label = 'spike';
-        console.log("建立尖刺");
+        console.log("Created spike");
         break;
       default:  // 'platform'
         platform = createPlatform(world, x, y);
-        // 確保普通平台有正確的標籤
+        // Ensure normal platform has correct label
         platform.body.label = 'platform';
-        console.log("建立普通平台，顏色:", platform.color);
+        console.log("Created normal platform, color:", platform.color);
     }
     
     const platformId = `platform_${Date.now()}_${Math.random()}`;
     
-    // 儲存平台引用以便後續管理
+    // Store platform reference for later management
     platformsRef.current[platformId] = platform;
     
-    // 更新最低平台位置
+    // Update lowest platform position
     if (y > lowestPlatformRef.current) {
       lowestPlatformRef.current = y;
     }
@@ -121,7 +127,7 @@ export default function GameScreen({ route, navigation }) {
     return { [platformId]: platform };
   };
   
-  // 主要物理系統
+  // Main physics system
   const Physics = (entities, { time }) => {
     const engine = entities.physics?.engine;
     if (!engine) {
@@ -131,25 +137,25 @@ export default function GameScreen({ route, navigation }) {
     
     const delta = Math.min(time.delta, 16.667);
 
-    // 處理遊戲結束
+    // Handle game over
     if (gameOver) {
       return entities;
     }
 
-    // 更新計分 - 改為每秒增加得分
+    // Update score - Changed to score increase per second
     const currentTime = Date.now();
     const elapsedTime = currentTime - lastScoreUpdateRef.current;
     
-    // 每秒增加 1 分
+    // Increase score by 1 point per second
     if (elapsedTime >= 1000) {
       setScore(prev => prev + 1);
       lastScoreUpdateRef.current = currentTime;
     }
 
-    // 處理畫面捲動
+    // Handle screen scrolling
     scrollPositionRef.current += SCROLL_SPEED;
     
-    // 捲動所有實體
+    // Scroll all entities
     Object.keys(entities).forEach(key => {
       const entity = entities[key];
       if (entity.body && key !== 'player1' && key !== 'physics' && 
@@ -158,7 +164,7 @@ export default function GameScreen({ route, navigation }) {
           key !== 'leftHead' && key !== 'rightHead' && key !== 'fireball') {
         Matter.Body.translate(entity.body, { x: 0, y: SCROLL_SPEED });
         
-        // 如果平台移出畫面頂部，則刪除它
+        // If platform moves out of top screen, remove it
         if (entity.body.position.y < -100) {
           delete platformsRef.current[key];
           Matter.World.remove(engine.world, entity.body);
@@ -167,16 +173,16 @@ export default function GameScreen({ route, navigation }) {
       }
     });
     
-    // 確保玩家不會卷動
+    // Ensure player doesn't scroll
     if (entities.player1) {
       const playerBody = entities.player1.body;
       
-      // 檢查玩家是否超出畫面下邊界（觸發遊戲結束）
+      // Check if player is out of bottom screen boundary (trigger game over)
       if (playerBody.position.y > height + 100) {
         setGameOver(true);
         Alert.alert(
           "Game Over",
-          `Your score: ${score}`,
+          `You lost, welcome to hell! Your score: ${score}`,
           [
             { text: "Return to Main Menu", onPress: () => navigation.navigate('MainScreen') }
           ]
@@ -184,260 +190,119 @@ export default function GameScreen({ route, navigation }) {
         return entities;
       }
       
-      // 處理長按移動
+      // Handle long press movement
       const runningSpeed = 2;
 
-      // 檢查玩家是否在平台上或在地面上
+      // Check platform contact
       const checkPlatformContact = () => {
-        const platforms = Object.values(platformsRef.current);
-        let isOnPlatform = false;
-        let onSpikeNow = false;
+        const playerBody = entities.player1.body;
+        const playerPosition = playerBody.position;
+        const playerWidth = playerBody.bounds.max.x - playerBody.bounds.min.x;
+        const playerHeight = playerBody.bounds.max.y - playerBody.bounds.min.y;
+        const playerBottom = playerPosition.y + playerHeight / 2;
+        const currentPlatforms = Object.values(platformsRef.current);
+        
+        let onPlatformNow = false;
+        let onSpringNow = false;
+        let onSpikesNow = false;
         let onTreadmillNow = false;
         let treadmillSpeed = 0;
-        let onSpringNow = false;
-        let currentPlatformType = 'none';  // 記錄當前所在的平台類型
-        let debugInfo = { platformsContacted: [] };
+        let currentPlatformBody = null;
         
-        platforms.forEach(platform => {
-          if (platform && platform.body) {
-            const platformTop = platform.body.bounds.min.y;
-            const playerBottom = playerBody.bounds.max.y;
-            const platformWidth = platform.body.bounds.max.x - platform.body.bounds.min.x;
-            const platformLeft = platform.body.bounds.min.x;
-            const platformRight = platform.body.bounds.max.x;
-            const playerX = playerBody.position.x;
-            const playerWidth = playerBody.bounds.max.x - playerBody.bounds.min.x;
-            const playerLeft = playerX - playerWidth / 2;
-            const playerRight = playerX + playerWidth / 2;
-            
-            // 計算玩家與平台的重疊部分
-            const overlapLeft = Math.max(playerLeft, platformLeft);
-            const overlapRight = Math.min(playerRight, platformRight);
-            const overlapWidth = Math.max(0, overlapRight - overlapLeft);
-            
-            // 玩家在平台上的百分比
-            const overlapPercent = overlapWidth / playerWidth;
-            
-            // 檢查玩家是否在平台正上方，增加垂直閾值
-            const verticalThreshold = 10;  // 增加閾值，使檢測更寬鬆
-            const isAbovePlatform = Math.abs(playerBottom - platformTop) <= verticalThreshold;
-            const isFalling = playerBody.velocity.y >= 0;  // 當 y 速度為 0 或正值時表示玩家正在下落或停止
-            
-            // 添加更多調試信息
-            if (Math.random() < 0.02) {
-              console.log(`與平台 ${platform.body.label} 的垂直距離: ${Math.abs(playerBottom - platformTop)}`);
-              console.log(`平台位置: (${platform.body.position.x}, ${platform.body.position.y}), 玩家位置: (${playerBody.position.x}, ${playerBody.position.y})`);
-              console.log(`平台頂部: ${platformTop}, 玩家底部: ${playerBottom}`);
-              console.log(`重疊比例: ${overlapPercent}`);
-            }
-            
-            if (isAbovePlatform) {
-              debugInfo.platformsContacted.push({
-                type: platform.body.label,
-                color: platform.color || 'unknown',
-                overlapPercent: overlapPercent,
-                position: {
-                  platform: { x: platform.body.position.x, y: platform.body.position.y },
-                  player: { x: playerX, y: playerBody.position.y }
-                }
-              });
-              
-              if (overlapPercent >= 0.1) {  // 大幅降低閾值，使玩家更容易站穩
-                // 如果玩家有一部分在平台上，可以站穩
-                isOnPlatform = true;
-                
-                // 根據平台類型設置不同的行為
-                if (platform.body.label === 'platform') {
-                  // 強制玩家站在平台上
-                  Matter.Body.setPosition(playerBody, {
-                    x: playerBody.position.x,
-                    y: platformTop - (playerBody.bounds.max.y - playerBody.bounds.min.y) / 2
-                  });
-                  Matter.Body.setVelocity(playerBody, {
-                    x: playerBody.velocity.x,
-                    y: 0  // 確保玩家停止下落
-                  });
-                  currentPlatformType = 'platform';
-                  console.log('站在普通平台上！顏色:', platform.color);
-                } else if (platform.body.label === 'treadmill') {
-                  // 確保玩家站在跑步機上
-                  Matter.Body.setPosition(playerBody, {
-                    x: playerBody.position.x,
-                    y: platformTop - (playerBody.bounds.max.y - playerBody.bounds.min.y) / 2
-                  });
-                  // 允許跑步機效果產生水平移動
-                  onTreadmillNow = true;
-                  treadmillSpeed = platform.body.treadmillSpeed || 0;
-                  currentPlatformType = 'treadmill';
-                  console.log('站在跑步機上！顏色:', platform.color, '速度:', treadmillSpeed);
-                } else if (platform.body.label === 'spike') {
-                  onSpikeNow = true;
-                  currentPlatformType = 'spike';
-                  console.log('站在尖刺上！');
-                } else if (platform.body.label === 'spring') {
-                  onSpringNow = true;
-                  currentPlatformType = 'spring';
-                  console.log('站在彈簧上！顏色:', platform.color);
-                }
-                
-                if (platform.body.label !== 'spike') {
-                  playerBody.friction = 0.1;
-                  Matter.Body.setAngle(playerBody, 0);
-                }
-              }
-            }
-          }
-        });
+        // Reset treadmill contact flag and speed
+        treadmillContactedRef.current = false;
+        currentTreadmillSpeedRef.current = 0;
         
-        // 每隔一段時間輸出調試信息
-        if (Math.random() < 0.02) {
-          console.log('平台接觸調試信息:', JSON.stringify(debugInfo));
-          console.log('玩家速度:', playerBody.velocity);
-          console.log('玩家所在階梯類型:', currentPlatformType);
-        }
-        
-        // 玩家站在平台上時，立即記錄平台類型
-        if (isOnPlatform) {
-          console.log('玩家當前所在階梯:', currentPlatformType);
-        }
-        
-        // 如果在 spike 上，處理特殊邏輯
-        if (onSpikeNow && playerBody.isTouchingSpike) {
-          // 徹底防止跳動
-          Matter.Body.setVelocity(playerBody, { x: 0, y: 0 });
-        }
-        
-        // 處理跑步機效果
-        if (onTreadmillNow || (playerBody.isTouchingTreadmill && playerBody.currentTreadmill)) {
-          let speed = treadmillSpeed;
-          let treadmill = null;
+        for (const platform of currentPlatforms) {
+          if (!platform || !platform.body) continue;
           
-          // 如果通過碰撞事件標記了跑步機，使用該跑步機的速度
-          if (playerBody.isTouchingTreadmill && playerBody.currentTreadmill) {
-            treadmill = playerBody.currentTreadmill;
-            speed = treadmill.treadmillSpeed || 0;
-            console.log(`使用碰撞標記的跑步機速度: ${speed}`);
-          } else {
-            // 查找當前接觸的跑步機
-            const currentTreadmills = Object.values(platformsRef.current).filter(
-              p => p && p.body && p.body.label === 'treadmill'
-            );
-            
-            for (const t of currentTreadmills) {
-              const treadmillTop = t.body.bounds.min.y;
-              const playerBottom = playerBody.bounds.max.y;
-              const verticalDistance = Math.abs(playerBottom - treadmillTop);
-              
-              if (verticalDistance <= 5) {
-                treadmill = t.body;
-                speed = t.body.treadmillSpeed || 0;
-                break;
-              }
-            }
-            
-            console.log(`使用檢測到的跑步機速度: ${speed}`);
-          }
+          const platformBody = platform.body;
+          const platformTop = platformBody.bounds.min.y;
+          const platformBottom = platformBody.bounds.max.y;
+          const platformLeft = platformBody.bounds.min.x;
+          const platformRight = platformBody.bounds.max.x;
+          const platformWidth = platformRight - platformLeft;
           
-          // 使用專門的處理函數處理跑步機效果
-          if (treadmill) {
-            handleTreadmillEffect(playerBody, treadmill, speed);
-          }
-        }
-        
-        // 處理彈簧效果 - 改進彈跳邏輯
-        if (onSpringNow && playerBody.velocity.y >= 0) {
-          // 只有當玩家下落時才觸發彈簧
-          const currentTime = Date.now();
-          const lastJumpTime = playerBody.lastJumpTime || 0;
+          // Calculate horizontal overlap between player and platform
+          const overlapLeft = Math.max(playerPosition.x - playerWidth / 2, platformLeft);
+          const overlapRight = Math.min(playerPosition.x + playerWidth / 2, platformRight);
+          const horizontalOverlap = Math.max(0, overlapRight - overlapLeft);
+          const overlapRatio = horizontalOverlap / playerWidth;
           
-          // 檢查是否可以進行彈跳 (確保冷卻時間)
-          if (currentTime - lastJumpTime > 500) {
-            // 確保玩家確實與彈簧接觸
-            const springPlatforms = Object.values(platformsRef.current).filter(
-              p => p && p.body && p.body.label === 'spring'
-            );
-            
-            let isReallyOnSpring = false;
-            let closestSpring = null;
-            let minDistance = 999999;
-            
-            for (const spring of springPlatforms) {
-              const springTop = spring.body.bounds.min.y;
-              const playerBottom = playerBody.bounds.max.y;
-              const springWidth = spring.body.bounds.max.x - spring.body.bounds.min.x;
-              const springLeft = spring.body.bounds.min.x;
-              const springRight = spring.body.bounds.max.x;
-              const playerX = playerBody.position.x;
-              const playerWidth = playerBody.bounds.max.x - playerBody.bounds.min.x;
-              const playerLeft = playerX - playerWidth / 2;
-              const playerRight = playerX + playerWidth / 2;
-              
-              // 計算重疊區域
-              const overlapLeft = Math.max(playerLeft, springLeft);
-              const overlapRight = Math.min(playerRight, springRight);
-              const overlapWidth = Math.max(0, overlapRight - overlapLeft);
-              const overlapPercent = overlapWidth / playerWidth;
-              
-              // 檢查垂直距離和水平重疊
-              const verticalDistance = Math.abs(playerBottom - springTop);
-              if (verticalDistance <= 10 && overlapPercent >= 0.3) {
-                isReallyOnSpring = true;
-                
-                // 記錄最近的彈簧
-                if (verticalDistance < minDistance) {
-                  minDistance = verticalDistance;
-                  closestSpring = spring;
-                }
-                
-                console.log("真正站在彈簧上! 重疊比例:", overlapPercent, "垂直距離:", verticalDistance);
-              }
-            }
-            
-            if (isReallyOnSpring && closestSpring) {
-              // 給予向上彈跳力以及適度的水平移動
-              const jumpVelocity = -10;  // 減小彈跳力度，防止過度彈跳
-              const horizontalBoost = (Math.random() - 0.5) * 2;  // 減少隨機左右偏移
-              
-              console.log("觸發彈簧彈跳!");
-              
-              // 先設置玩家位置到彈簧上方
-              const springTop = closestSpring.body.bounds.min.y;
-              const playerHeight = playerBody.bounds.max.y - playerBody.bounds.min.y;
-              
+          // If player's bottom is close to platform's top and there is sufficient overlap
+          const verticalDistance = Math.abs(playerBottom - platformTop);
+          const isPenetrating = playerBottom > platformTop && playerBottom < platformBottom;
+          
+          // Detect if player is on the platform - require minimum 50% overlap
+          // This ensures player falls when half or more of their body is off the platform
+          if ((verticalDistance <= 8 && overlapRatio >= 0.5) || (isPenetrating && overlapRatio >= 0.5)) {
+            // If penetrating, correct position
+            if (isPenetrating) {
+              console.log("Correcting player position - platform penetration detected");
               Matter.Body.setPosition(playerBody, {
-                x: playerBody.position.x + horizontalBoost,
-                y: springTop - playerHeight / 2 - 1
+                x: playerBody.position.x,
+                y: platformTop - playerHeight/2 - 1 // Position 1px above platform
               });
-              
-              // 然後應用垂直速度，強制使用固定值以確保一致性
-              Matter.Body.setVelocity(playerBody, {
-                x: horizontalBoost,
-                y: jumpVelocity
-              });
-              
-              // 增加重力影響
-              Matter.Body.applyForce(playerBody, playerBody.position, {
-                x: 0, 
-                y: 0.001 // 輕微向下力
-              });
-              
-              playerBody.lastJumpTime = currentTime;
-              
-              // 防止連續彈跳，設置一個短暫的無碰撞狀態
-              playerBody.isJumping = true;
-              setTimeout(() => {
-                if (playerBody) playerBody.isJumping = false;
-              }, 300);
             }
+            
+            // Store current platform for reference
+            currentPlatformBody = platformBody;
+            
+            // Check platform type
+            if (platformBody.label === 'platform') {
+              onPlatformNow = true;
+              // Ensure zero bounce on platforms
+              playerBody.restitution = 0;
+            } else if (platformBody.label === 'spring') {
+              onSpringNow = true;
+            } else if (platformBody.label === 'spike') {
+              onSpikesNow = true;
+              playerBody.isTouchingSpike = true; // Ensure spike flag is set
+            } else if (platformBody.label === 'treadmill') {
+              onTreadmillNow = true;
+              treadmillSpeed = platformBody.treadmillSpeed || 4; // Use default value 4
+              treadmillContactedRef.current = true;
+              currentTreadmillSpeedRef.current = treadmillSpeed;
+              // Ensure zero bounce on treadmills
+              playerBody.restitution = 0;
+              
+              console.log(`Player contacted treadmill! Speed: ${treadmillSpeed}`);
+            }
+          } else if (isPenetrating && overlapRatio < 0.5) {
+            // Player is penetrating but not enough overlap to be supported
+            // Allow them to fall by not setting any platform flags
+            console.log(`Player has insufficient overlap (${overlapRatio.toFixed(2)}) to be supported by platform`);
+            
+            // No pushing force, just let physics handle it naturally
           }
         }
         
-        return { isOnPlatform, currentPlatformType };
+        const isOnPlatform = onPlatformNow || onSpringNow || onSpikesNow || onTreadmillNow;
+        const currentPlatformType = onPlatformNow ? 'platform' :
+                                    onSpringNow ? 'spring' :
+                                    onSpikesNow ? 'spike' :
+                                    onTreadmillNow ? 'treadmill' : 'none';
+        
+        // Cut vertical velocity to eliminate bouncing when on a platform
+        if (isOnPlatform && currentPlatformType !== 'spring') {
+          Matter.Body.setVelocity(playerBody, {
+            x: playerBody.velocity.x,
+            y: 0 // Zero vertical velocity to eliminate bounce
+          });
+        }
+        
+        // Handle treadmill effect if on treadmill
+        if (onTreadmillNow && treadmillSpeed !== 0) {
+          console.log(`Applying treadmill effect with speed: ${treadmillSpeed}`);
+          handleTreadmillEffect(playerBody, currentPlatformBody, treadmillSpeed);
+        }
+        
+        return { isOnPlatform, currentPlatformType, currentPlatformBody };
       };
 
-      const { isOnPlatform, currentPlatformType } = checkPlatformContact();
+      const { isOnPlatform, currentPlatformType, currentPlatformBody } = checkPlatformContact();
 
-      // 允許在任何平台上移動，包括 spike
+      // Allow movement on any platform, including spike
       if (isOnPlatform) {
         if (isHoldingLeft) {
           Matter.Body.setVelocity(playerBody, {
@@ -450,16 +315,16 @@ export default function GameScreen({ route, navigation }) {
             y: playerBody.velocity.y
           });
         } else {
-          // 當沒有按鍵時，根據平台類型處理
+          // When no keys are pressed, handle based on platform type
           if (currentPlatformType === 'platform') {
-            // 在普通平台上完全停止水平和垂直移動
+            // Completely stop horizontal and vertical movement on normal platform
             Matter.Body.setVelocity(playerBody, {
               x: 0,
-              y: 0  // 將垂直速度也設為0，防止彈跳
+              y: 0  // Set vertical velocity to 0 to prevent bounce
             });
           } else if (!playerBody.isTouchingSpike) {
-            // 其他非尖刺平台上應用摩擦力
-            const friction = 0.4;  // 增加摩擦力，讓停止更加自然
+            // Apply friction on non-spike platforms
+            const friction = 0.4;  // Increased friction to make stopping more natural
             Matter.Body.setVelocity(playerBody, {
               x: playerBody.velocity.x * (1 - friction),
               y: playerBody.velocity.y
@@ -468,9 +333,9 @@ export default function GameScreen({ route, navigation }) {
         }
       }
       
-      // 動態添加新平台 - 現在在底部添加
+      // Dynamic new platform addition - Now added at bottom
       const screenBottomY = -scrollPositionRef.current + height;
-      const visibleBottomEdge = screenBottomY + 200;  // 在可見區域下方稍遠處添加平台
+      const visibleBottomEdge = screenBottomY + 200;  // Add platform slightly further below visible area
       
       if (lowestPlatformRef.current < visibleBottomEdge) {
         const newPlatformY = lowestPlatformRef.current + (PLATFORM_GAP_MIN + Math.random() * (PLATFORM_GAP_MAX - PLATFORM_GAP_MIN));
@@ -488,9 +353,9 @@ export default function GameScreen({ route, navigation }) {
       enableSleeping: false
     });
     
-    // 設置物理世界參數 - 增加重力以讓玩家感覺更重
-    engine.gravity.scale = 0.01;  // 增加重力比例，從0.005到0.01
-    engine.gravity.y = 1;          // 保持重力向下
+    // Set physics world parameters - Increased gravity to make player feel heavier
+    engine.gravity.scale = 0.01;  // Increased gravity ratio, from 0.005 to 0.01
+    engine.gravity.y = 1;          // Keep gravity downward
     
     engineRef.current = engine;
     
@@ -501,34 +366,34 @@ export default function GameScreen({ route, navigation }) {
     
     const world = engine.world;
     
-    // 初始化平台和玩家
+    // Initialize platforms and player
     platformsRef.current = {};
     scrollPositionRef.current = 0;
     
-    // 創建邊界
+    // Create boundaries
     const boundaries = createBoundaries(world);
     
-    // 創建初始平台，從上到下
+    // Create initial platforms, from top to bottom
     const initialEntities = { 
       physics: { engine, world },
       ...boundaries
     };
     
-    // 確保第一個平台位於玩家上方並足夠寬
+    // Ensure first platform is above player and wide enough
     const firstPlatformY = height * 0.3;
     const firstPlatform = createPlatform(world, width / 2, firstPlatformY);
     const firstPlatformId = 'platform_initial';
     platformsRef.current[firstPlatformId] = firstPlatform;
     initialEntities[firstPlatformId] = firstPlatform;
     
-    // 創建更多初始平台，確保四種類型都有
+    // Create more initial platforms, ensure four types are present
     let lastY = firstPlatformY;
     lowestPlatformRef.current = lastY;
     
-    // 強制在初始階段創建四種不同類型的平台
+    // Force creating platforms of four different types in initial stage
     const forcedTypes = ['platform', 'treadmill', 'spring', 'spike'];
     
-    // 首先確保每種類型都至少有一個
+    // First ensure each type is present at least once
     for (let i = 0; i < forcedTypes.length; i++) {
       lastY += (PLATFORM_GAP_MIN + Math.random() * (PLATFORM_GAP_MAX - PLATFORM_GAP_MIN));
       
@@ -537,7 +402,7 @@ export default function GameScreen({ route, navigation }) {
       
       switch (forcedTypes[i]) {
         case 'treadmill':
-          const direction = Math.random() < 0.5 ? -2 : 2;  // 增加速度大小，從±1增加到±2
+          const direction = Math.random() < 0.5 ? -2 : 2;  // Increased speed size, from ±1 to ±2
           platform = createTreadmill(world, x, lastY, direction);
           break;
         case 'spring':
@@ -555,10 +420,10 @@ export default function GameScreen({ route, navigation }) {
       initialEntities[platformId] = platform;
       lowestPlatformRef.current = lastY;
       
-      console.log(`創建強制類型平台: ${forcedTypes[i]}，顏色:`, platform.color || '使用圖像');
+      console.log(`Created forced type platform: ${forcedTypes[i]}, Color:`, platform.color || 'Using image');
     }
     
-    // 再創建一些隨機平台
+    // Create more random platforms
     for (let i = 0; i < INITIAL_PLATFORMS - forcedTypes.length; i++) {
       lastY += (PLATFORM_GAP_MIN + Math.random() * (PLATFORM_GAP_MAX - PLATFORM_GAP_MIN));
       const platformEntities = createRandomPlatform(world, lastY, true);
@@ -566,9 +431,9 @@ export default function GameScreen({ route, navigation }) {
       lowestPlatformRef.current = lastY;
     }
     
-    // 創建玩家在第一個平台上方，增加質量讓他更有重量感
+    // Create player above first platform, increase mass to make him heavier
     const player = createPlayer(world, width / 2, firstPlatformY - 50, selectedPlayer);
-    player.body.mass = player.body.mass * 3;  // 大幅增加玩家質量，從1.5倍增加到3倍
+    player.body.mass = player.body.mass * 3;  // Significantly increase player mass, from 1.5x to 3x
     initialEntities.player1 = player;
 
     setEntities(initialEntities);
@@ -579,15 +444,13 @@ export default function GameScreen({ route, navigation }) {
     };
   }, [selectedPlayer]);
 
-  // 添加碰撞處理邏輯
+  // Add collision handling logic
   useEffect(() => {
     const engine = engineRef.current;
     if (!engine) {
       console.error('Collision setup: Engine is undefined!');
       return;
     }
-    
-    let isOnSpike = false;
     
     const collisionStartHandler = (event) => {
       if (!event || !event.pairs) {
@@ -598,58 +461,55 @@ export default function GameScreen({ route, navigation }) {
       event.pairs.forEach((pair) => {
         const { bodyA, bodyB } = pair;
         
-        // 處理與跑步機的碰撞
+        // Handle treadmill collision
         if ((bodyA.label === 'player' && bodyB.label === 'treadmill') ||
             (bodyA.label === 'treadmill' && bodyB.label === 'player')) {
           const playerBody = bodyA.label === 'player' ? bodyA : bodyB;
           const treadmillBody = bodyA.label === 'treadmill' ? bodyA : bodyB;
           
-          console.log('玩家與跑步機碰撞開始!');
+          console.log('Player and treadmill collision started!');
           
-          // 強制玩家站在跑步機上
+          // Force player to stand on treadmill
           const treadmillTop = treadmillBody.bounds.min.y;
           Matter.Body.setPosition(playerBody, {
             x: playerBody.position.x,
-            y: treadmillTop - (playerBody.bounds.max.y - playerBody.bounds.min.y) / 2 - 2  // 稍微上移一點防止穿透
+            y: treadmillTop - (playerBody.bounds.max.y - playerBody.bounds.min.y) / 2 - 2  // Move slightly up to prevent penetration
           });
           
-          // 停止玩家垂直速度
+          // Stop player vertical speed
           Matter.Body.setVelocity(playerBody, {
             x: playerBody.velocity.x,
             y: 0
           });
           
-          // 標記玩家正在接觸跑步機
+          // Mark player touching treadmill
           playerBody.isTouchingTreadmill = true;
           playerBody.currentTreadmill = treadmillBody;
         }
         
-        // 處理與 spike 的碰撞
+        // Handle spike collision
         if ((bodyA.label === 'player' && bodyB.label === 'spike') ||
             (bodyA.label === 'spike' && bodyB.label === 'player')) {
-          if (isOnSpike) return;
-          
-          isOnSpike = true;
           const playerBody = bodyA.label === 'player' ? bodyA : bodyB;
           const spikeBody = bodyA.label === 'spike' ? bodyA : bodyB;
           
-          // 檢查是否在冷卻時間內
+          // Check if within cooling time
           const currentTime = Date.now();
           if (currentTime - lastDamageTime < 1000) {
             return;
           }
           
-          // 更新上次受傷時間
+          // Update last damage time
           setLastDamageTime(currentTime);
           
-          // 減少生命值
+          // Reduce lives
           setLives((prev) => {
             const newLives = Math.max(0, prev - 2);
             if (newLives <= 0 && !gameOver) {
               setGameOver(true);
               Alert.alert(
                 "Game Over",
-                `You lose, welcome to hell!`,
+                `You lost, welcome to hell! Your score: ${score}`,
                 [
                   { text: "Return to Main Menu", onPress: () => navigation.navigate('MainScreen') }
                 ]
@@ -658,74 +518,88 @@ export default function GameScreen({ route, navigation }) {
             return newLives;
           });
           
-          // 完全停止玩家移動並強制設置在 spike 上
+          // Completely stop player movement and force set on spike
           Matter.Body.setVelocity(playerBody, { x: 0, y: 0 });
           Matter.Body.setAngularVelocity(playerBody, 0);
           
-          // 精確地放置玩家在 spike 上
+          // Precisely place player on spike
           Matter.Body.setPosition(playerBody, {
             x: playerBody.position.x,
             y: spikeBody.position.y - (spikeBody.bounds.max.y - spikeBody.bounds.min.y) / 2 - 
-               (playerBody.bounds.max.y - playerBody.bounds.min.y) / 2 + 5
+               (playerBody.bounds.max.y - playerBody.bounds.min.y) / 2 + 2 // More precise positioning
           });
           
-          // 增加玩家質量，使其更穩定，並降低彈性
+          // Increase player mass to make him more stable and reduce elasticity
           const originalMass = playerBody.mass;
           Matter.Body.setMass(playerBody, originalMass * 5);
-          playerBody.restitution = 0;  // 去除彈性
+          playerBody.restitution = 0;  // Remove elasticity
+          playerBody.friction = 1.0;   // Maximum friction
           
-          // 設置一個標記，防止連續損傷
+          // Set a flag to prevent continuous damage
           playerBody.isTouchingSpike = true;
+          playerBody.currentSpike = spikeBody; // Record current spike
           
-          // 添加特殊處理函數以防止彈跳
+          // Add special handling function to prevent bounce
           const preventBounce = () => {
             if (playerBody && playerBody.isTouchingSpike) {
               Matter.Body.setVelocity(playerBody, { x: 0, y: 0 });
+              
+              // Ensure player stays on spike
+              if (playerBody.currentSpike) {
+                const spikeTop = playerBody.currentSpike.bounds.min.y;
+                const playerHeight = playerBody.bounds.max.y - playerBody.bounds.min.y;
+                
+                Matter.Body.setPosition(playerBody, {
+                  x: playerBody.position.x,
+                  y: spikeTop - playerHeight/2
+                });
+              }
             }
           };
           
-          // 建立彈跳檢測間隔
+          // Create bounce detection interval
           const bounceInterval = setInterval(preventBounce, 16);
           
-          // 5秒後重置狀態
+          // 3 seconds later restore physical properties but keep player on spike
           setTimeout(() => {
             if (playerBody) {
-              // 停止彈跳檢測
+              // Stop bounce detection
               clearInterval(bounceInterval);
               
-              // 恢復原來的質量
+              // Restore original mass and physical properties but stay on spike
               Matter.Body.setMass(playerBody, originalMass);
-              playerBody.restitution = 0;  // 保持無彈性
-              isOnSpike = false;
-              playerBody.isTouchingSpike = false;
+              playerBody.restitution = 0;  // Keep non-elastic
+              
+              // Allow player to move slightly but initial speed still 0
+              Matter.Body.setVelocity(playerBody, { x: 0, y: 0 });
             }
-          }, 5000);
+          }, 3000);
         }
         
-        // 處理與邊界的碰撞
+        // Handle boundary collision
         if (bodyA.label === 'player' || bodyB.label === 'player') {
           const playerBody = bodyA.label === 'player' ? bodyA : bodyB;
           const otherBody = bodyA.label === 'player' ? bodyB : bodyA;
           
-          // 處理頂部邊界碰撞
+          // Handle top boundary collision
           if (otherBody.label === 'topBoundary') {
-            // 檢查是否在冷卻時間內
+            // Check if within cooling time
             const currentTime = Date.now();
             if (currentTime - lastDamageTime < 1000) {
               return;
             }
             
-            // 更新上次受傷時間
+            // Update last damage time
             setLastDamageTime(currentTime);
             
-            // 減少生命值（碰到頂部邊界損失1點生命）
+            // Reduce lives (losing 1 life when hitting top boundary)
             setLives((prev) => {
               const newLives = Math.max(0, prev - 1);
               if (newLives <= 0 && !gameOver) {
                 setGameOver(true);
                 Alert.alert(
                   "Game Over",
-                  `Your score: ${score}`,
+                  `You lost, welcome to hell! Your score: ${score}`,
                   [
                     { text: "Return to Main Menu", onPress: () => navigation.navigate('MainScreen') }
                   ]
@@ -734,16 +608,16 @@ export default function GameScreen({ route, navigation }) {
               return newLives;
             });
             
-            // 將玩家向下彈開，但不要太強烈
+            // Push player down but not too strongly
             Matter.Body.setVelocity(playerBody, {
               x: playerBody.velocity.x,
-              y: 5 // 輕微向下彈開
+              y: 5 // Mildly push down
             });
           }
           
-          // 處理左右邊界碰撞
+          // Handle left and right boundary collisions
           if (otherBody.label === 'leftBoundary' || otherBody.label === 'rightBoundary') {
-            // 將玩家向中間彈開，減少彈力
+            // Push player towards center, reduce bounce
             const pushDirection = playerBody.position.x > width / 2 ? -1 : 1;
             
             Matter.Body.setVelocity(playerBody, {
@@ -751,23 +625,23 @@ export default function GameScreen({ route, navigation }) {
               y: playerBody.velocity.y
             });
             
-            // 檢查是否在冷卻時間內
+            // Check if within cooling time
             const currentTime = Date.now();
             if (currentTime - lastDamageTime < 1000) {
               return;
             }
             
-            // 更新上次受傷時間
+            // Update last damage time
             setLastDamageTime(currentTime);
             
-            // 減少生命值（碰到邊界損失1點生命）
+            // Reduce lives (losing 1 life when hitting boundary)
             setLives((prev) => {
               const newLives = Math.max(0, prev - 1);
               if (newLives <= 0 && !gameOver) {
                 setGameOver(true);
                 Alert.alert(
                   "Game Over",
-                  `Your score: ${score}`,
+                  `You lost, welcome to hell! Your score: ${score}`,
                   [
                     { text: "Return to Main Menu", onPress: () => navigation.navigate('MainScreen') }
                   ]
@@ -775,6 +649,69 @@ export default function GameScreen({ route, navigation }) {
               }
               return newLives;
             });
+          }
+        }
+
+        // Handle spring collision
+        if ((bodyA.label === 'player' && bodyB.label === 'spring') ||
+            (bodyA.label === 'spring' && bodyB.label === 'player')) {
+          const playerBody = bodyA.label === 'player' ? bodyA : bodyB;
+          const springBody = bodyA.label === 'spring' ? bodyA : bodyB;
+          
+          console.log('Player collision with spring started!');
+          
+          // Check if player is truly colliding with spring (not just passing by)
+          const springTop = springBody.bounds.min.y;
+          const playerBottom = playerBody.bounds.max.y;
+          const playerHeight = playerBody.bounds.max.y - playerBody.bounds.min.y;
+          
+          // Calculate horizontal overlap to ensure player is really on the spring
+          const springWidth = springBody.bounds.max.x - springBody.bounds.min.x;
+          const springLeft = springBody.bounds.min.x;
+          const springRight = springBody.bounds.max.x;
+          const playerWidth = playerBody.bounds.max.x - playerBody.bounds.min.x;
+          const playerLeft = playerBody.position.x - playerWidth / 2;
+          const playerRight = playerBody.position.x + playerWidth / 2;
+          
+          // Calculate overlap
+          const overlapLeft = Math.max(playerLeft, springLeft);
+          const overlapRight = Math.min(playerRight, springRight);
+          const overlapWidth = Math.max(0, overlapRight - overlapLeft);
+          const overlapRatio = overlapWidth / playerWidth;
+          
+          // Only trigger spring if player is actually on top of it with sufficient overlap
+          const verticalDistance = Math.abs(playerBottom - springTop);
+          if (verticalDistance <= 10 && overlapRatio >= 0.3 && playerBody.velocity.y >= 0) {
+            // Position player precisely on top of spring to prevent penetration
+            Matter.Body.setPosition(playerBody, {
+              x: playerBody.position.x,
+              y: springTop - playerHeight/2 - 1 // 1 pixel above spring surface
+            });
+            
+            // Gentler upward bounce with lower velocity
+            Matter.Body.setVelocity(playerBody, {
+              x: playerBody.velocity.x * 0.9, // Maintain most horizontal momentum
+              y: -10  // Reduced from -15 to -10 for gentler bounce
+            });
+            
+            // Apply weaker upward force
+            Matter.Body.applyForce(playerBody, playerBody.position, {
+              x: 0,
+              y: -0.01 // Reduced from -0.03 to -0.01 for gentler effect
+            });
+            
+            // Increase lives if below 10 (no cooldown for spring healing)
+            if (lives < 10) {
+              setLives(prev => Math.min(prev + 1, 10));
+              console.log('Healed 1 life from spring jump!');
+            }
+            
+            // Set player properties for better spring effect
+            playerBody.restitution = 0.1;  // Further reduced from 0.3 to 0.1 for minimal bounce
+            
+            console.log(`Spring applied velocity: ${JSON.stringify(playerBody.velocity)}`);
+          } else {
+            console.log('Spring collision detected but not actually on top - no bounce applied');
           }
         }
       });
@@ -786,26 +723,33 @@ export default function GameScreen({ route, navigation }) {
       event.pairs.forEach((pair) => {
         const { bodyA, bodyB } = pair;
         
-        // 處理跑步機碰撞結束
+        // Handle treadmill collision end
         if ((bodyA.label === 'player' && bodyB.label === 'treadmill') ||
             (bodyA.label === 'treadmill' && bodyB.label === 'player')) {
           const playerBody = bodyA.label === 'player' ? bodyA : bodyB;
           
-          console.log('玩家與跑步機碰撞結束!');
+          console.log('Player and treadmill collision ended!');
           
-          // 清除跑步機標記
+          // Clear treadmill flag
           playerBody.isTouchingTreadmill = false;
           playerBody.currentTreadmill = null;
         }
         
+        // Handle spike collision end
         if ((bodyA.label === 'player' && bodyB.label === 'spike') ||
             (bodyA.label === 'spike' && bodyB.label === 'player')) {
           const playerBody = bodyA.label === 'player' ? bodyA : bodyB;
           
-          // 檢查玩家是否真的完全離開了 spike
-          if (playerBody.velocity.y < 0 || Math.abs(playerBody.velocity.x) > 1) {
-            isOnSpike = false;
+          // Only reset spike state when player explicitly leaves spike
+          // Check if there is a clear horizontal movement or upward movement
+          if ((Math.abs(playerBody.velocity.x) > 3 || playerBody.velocity.y < -1) && 
+              playerBody.position.y < playerBody.currentSpike?.position.y - 20) {
+            console.log('Player explicitly left spike');
             playerBody.isTouchingSpike = false;
+            playerBody.currentSpike = null;
+          } else {
+            // If physics engine tries to separate them but player is still on spike, maintain spike contact
+            console.log('Maintain spike contact state');
           }
         }
       });
@@ -832,7 +776,7 @@ export default function GameScreen({ route, navigation }) {
     const playerBody = entities.player1.body;
     const stepSize = 15;
 
-    // 修復長按移動鍵，設置位置並給予速度
+    // Fix long press movement keys, set position and give speed
     Matter.Body.setPosition(playerBody, {
       x: playerBody.position.x + (direction * stepSize),
       y: playerBody.position.y
@@ -844,15 +788,15 @@ export default function GameScreen({ route, navigation }) {
     });
   };
 
-  // 創建頭部裝飾物
+  // Create head decoration
   useEffect(() => {
     if (!entities || !entities.physics) return;
     
     const world = entities.physics.world;
     const headRadius = 20;
-    const headOffset = 40;  // 頭部與邊界的距離
+    const headOffset = 40;  // Distance from boundary to head
     
-    // 左側頭部 - 確保完全固定
+    // Left head - Ensure fully fixed
     const leftHead = Matter.Bodies.circle(
       headOffset, 
       height / 2, 
@@ -862,11 +806,11 @@ export default function GameScreen({ route, navigation }) {
         isSensor: true,
         label: 'leftHead',
         render: { fillStyle: '#ff0000' },
-        collisionFilter: { group: 0 }  // 使用碰撞組別確保不受影響
+        collisionFilter: { group: 0 }  // Use collision group to ensure unaffected
       }
     );
     
-    // 右側頭部 - 確保完全固定
+    // Right head - Ensure fully fixed
     const rightHead = Matter.Bodies.circle(
       width - headOffset, 
       height / 2, 
@@ -876,17 +820,17 @@ export default function GameScreen({ route, navigation }) {
         isSensor: true,
         label: 'rightHead',
         render: { fillStyle: '#ff0000' },
-        collisionFilter: { group: 0 }  // 使用碰撞組別確保不受影響
+        collisionFilter: { group: 0 }  // Use collision group to ensure unaffected
       }
     );
     
-    // 確保頭部保持在固定位置，設置為永久靜態
+    // Ensure head stays in fixed position, set as permanent static
     Matter.Body.setStatic(leftHead, true);
     Matter.Body.setStatic(rightHead, true);
     
     Matter.World.add(world, [leftHead, rightHead]);
     
-    // 更新實體
+    // Update entities
     setEntities(prevEntities => ({
       ...prevEntities,
       leftHead: { 
@@ -894,28 +838,28 @@ export default function GameScreen({ route, navigation }) {
         size: [headRadius*2, headRadius*2], 
         color: 'red', 
         renderer: 'circle',
-        isStatic: true  // 明確標記為靜態
+        isStatic: true  // Explicitly mark as static
       },
       rightHead: { 
         body: rightHead, 
         size: [headRadius*2, headRadius*2], 
         color: 'red', 
         renderer: 'circle',
-        isStatic: true  // 明確標記為靜態
+        isStatic: true  // Explicitly mark as static
       }
     }));
     
   }, [entities?.physics]);
   
-  // 添加 fireball
+  // Add fireball
   useEffect(() => {
     if (!entities || !entities.physics) return;
     
     const world = entities.physics.world;
     const fireballRadius = 15;
-    const fireballY = 60;  // 放在屏幕上方
+    const fireballY = 60;  // Put above screen
     
-    // 創建 fireball
+    // Create fireball
     const fireball = Matter.Bodies.circle(
       width / 2, 
       fireballY, 
@@ -930,7 +874,7 @@ export default function GameScreen({ route, navigation }) {
     
     Matter.World.add(world, [fireball]);
     
-    // 更新實體
+    // Update entities
     setEntities(prevEntities => ({
       ...prevEntities,
       fireball: { body: fireball, size: [fireballRadius*2, fireballRadius*2], color: 'orange', renderer: 'circle' }
@@ -938,24 +882,24 @@ export default function GameScreen({ route, navigation }) {
     
   }, [entities?.physics]);
 
-  // 添加持續監控機制來防止玩家穿透跑步機
+  // Add continuous monitoring mechanism to prevent player from penetrating treadmill
   useEffect(() => {
     if (!entities || !entities.player1 || !entities.player1.body) return;
     
     const playerBody = entities.player1.body;
     const checkInterval = setInterval(() => {
-      // 檢查玩家是否正站在跑步機上
+      // Check if player is standing on treadmill
       if (playerBody.isTouchingTreadmill && playerBody.currentTreadmill) {
         const treadmill = playerBody.currentTreadmill;
         if (treadmill) {
-          // 計算玩家與跑步機的相對位置
+          // Calculate player's relative position to treadmill
           const treadmillTop = treadmill.bounds.min.y;
           const playerBottom = playerBody.bounds.max.y;
           const relativePosition = playerBottom - treadmillTop;
           
-          // 如果相對位置表明可能穿透或者下滑，則修正位置
+          // If relative position indicates possible penetration or slide, adjust position
           if (relativePosition > 5 || playerBody.velocity.y > 0) {
-            console.log("防止穿透：重新定位玩家到跑步機上");
+            console.log("Prevent penetration: Re-position player to treadmill");
             
             Matter.Body.setPosition(playerBody, {
               x: playerBody.position.x,
@@ -969,25 +913,25 @@ export default function GameScreen({ route, navigation }) {
           }
         }
       }
-    }, 50); // 每 50ms 檢查一次
+    }, 50); // Check every 50ms
     
     return () => clearInterval(checkInterval);
   }, [entities]);
 
-  // 修改跑步機效果處理，增強推力
+  // Modify treadmill effect handling, enhance push force
   const handleTreadmillEffect = (playerBody, treadmill, speed) => {
-    // 使用直接速度設置以確保明顯的推力效果
+    // Use direct speed setting to ensure obvious push force effect
     Matter.Body.setVelocity(playerBody, {
-      x: playerBody.velocity.x + speed * 0.3, // 大幅增加效果強度，確保能感受到推力
-      y: 0 // 確保垂直速度為0，防止穿透
+      x: playerBody.velocity.x + speed * 0.3, // Significantly increase effect strength, ensure feeling push force
+      y: 0 // Ensure vertical speed is 0 to prevent penetration
     });
     
-    // 確保玩家位置只在必要時調整
+    // Ensure player position only adjusted when necessary
     const treadmillTop = treadmill.bounds.min.y;
     const playerBottom = playerBody.bounds.max.y;
     const playerHeight = playerBody.bounds.max.y - playerBody.bounds.min.y;
     
-    // 只有當玩家明顯下滑或穿透時才調整位置
+    // Only adjust position when player visibly slides or penetrates
     if (playerBottom - treadmillTop > 3) {
       Matter.Body.setPosition(playerBody, {
         x: playerBody.position.x,
@@ -1062,7 +1006,7 @@ const styles = StyleSheet.create({
     left: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: width - 40, // 減去左右各20的padding
+    width: width - 40, // Subtract left and right 20 padding
   },
   statsLeft: {
     flexDirection: 'row',
