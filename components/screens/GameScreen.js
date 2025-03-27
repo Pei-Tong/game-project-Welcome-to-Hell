@@ -255,7 +255,8 @@ export default function GameScreen({ route, navigation }) {
           const verticalDistance = Math.abs(playerBottom - platformTop);
           const isPenetrating = playerBottom > platformTop && playerBottom < platformBottom;
           
-          if ((verticalDistance <= 8 && overlapRatio >= 0.3) || isPenetrating) { // Detect both close proximity and penetration
+          // Detect if player is on the platform
+          if ((verticalDistance <= 8 && overlapRatio >= 0.5) || (isPenetrating && overlapRatio >= 0.5)) {
             // If penetrating, correct position
             if (isPenetrating) {
               console.log("Correcting player position - platform penetration detected");
@@ -284,6 +285,17 @@ export default function GameScreen({ route, navigation }) {
               
               console.log(`Player contacted treadmill! Speed: ${treadmillSpeed}`);
             }
+          } else if (isPenetrating && overlapRatio < 0.5) {
+            // Player is penetrating but not enough overlap to be supported
+            // Allow them to fall by not setting any platform flags
+            console.log(`Player has insufficient overlap (${overlapRatio.toFixed(2)}) to be supported by platform`);
+            
+            // If player is already penetrating but has insufficient overlap, gently push them off
+            const pushDirection = playerPosition.x < (platformLeft + platformRight) / 2 ? -1 : 1;
+            Matter.Body.applyForce(playerBody, playerBody.position, {
+              x: pushDirection * 0.0005, // Very gentle push
+              y: 0
+            });
           }
         }
         
@@ -292,6 +304,13 @@ export default function GameScreen({ route, navigation }) {
                                     onSpringNow ? 'spring' :
                                     onSpikesNow ? 'spike' :
                                     onTreadmillNow ? 'treadmill' : 'none';
+        
+        // Debugging output
+        if (isOnPlatform) {
+          console.log(`Player is on ${currentPlatformType}, status: platform=${onPlatformNow}, spring=${onSpringNow}, spike=${onSpikesNow}, treadmill=${onTreadmillNow}`);
+        } else {
+          console.log("Player is not on any platform");
+        }
         
         // Handle treadmill effect if on treadmill
         if (onTreadmillNow && treadmillSpeed !== 0) {
