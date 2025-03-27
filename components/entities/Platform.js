@@ -1,25 +1,33 @@
 import Matter from 'matter-js';
 import RenderEntity from '../RenderEntity';
-import { Dimensions } from 'react-native';
+import { getRandomColor } from '../../utils/helpers';
 
-const { width } = Dimensions.get('window');
-
-const createPlatform = (world, x, y) => {
+const createPlatform = (world, x, y, width = 100, height = 20) => {
   const platform = Matter.Bodies.rectangle(
-    x, 
+    x,
     y,
-    100,
-    20,
-    { isStatic: true, label: 'platform' }
+    width,
+    height,
+    { 
+      isStatic: true,
+      friction: 1.0,       // High friction for stability
+      restitution: 0,      // No bounce at all
+      label: 'platform',
+      slop: 0,             // No slop for precise contact
+      collisionFilter: {
+        category: 0x0002,
+        mask: 0xFFFFFFFF
+      }
+    }
   );
 
   Matter.World.add(world, platform);
 
   return {
     body: platform,
-    size: [100, 20],
-    color: 'grey',
-    renderer: RenderEntity,
+    size: [width, height],
+    color: getRandomColor(),
+    renderer: RenderEntity
   };
 };
 

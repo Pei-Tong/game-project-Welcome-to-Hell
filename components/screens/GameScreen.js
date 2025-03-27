@@ -255,8 +255,9 @@ export default function GameScreen({ route, navigation }) {
           const verticalDistance = Math.abs(playerBottom - platformTop);
           const isPenetrating = playerBottom > platformTop && playerBottom < platformBottom;
           
-          // Detect if player is on the platform
-          if ((verticalDistance <= 8 && overlapRatio >= 0.5) || (isPenetrating && overlapRatio >= 0.5)) {
+          // Detect if player is on the platform - reduced overlap requirement to 35%
+          // This allows for more stable standing on edges
+          if ((verticalDistance <= 8 && overlapRatio >= 0.35) || (isPenetrating && overlapRatio >= 0.35)) {
             // If penetrating, correct position
             if (isPenetrating) {
               console.log("Correcting player position - platform penetration detected");
@@ -266,12 +267,32 @@ export default function GameScreen({ route, navigation }) {
               });
             }
             
+            // If player is near edge but still on platform, help center them
+            if (overlapRatio < 0.5 && overlapRatio >= 0.35) {
+              // Find the center of the overlapping part
+              const overlapCenter = (overlapLeft + overlapRight) / 2;
+              // Gently nudge player toward platform center
+              Matter.Body.applyForce(playerBody, playerBody.position, {
+                x: (overlapCenter - playerPosition.x) * 0.0001, // Very gentle centering force
+                y: 0
+              });
+              console.log("Stabilizing player on platform edge");
+            }
+            
+            // Cut vertical velocity to eliminate bouncing
+            Matter.Body.setVelocity(playerBody, {
+              x: playerBody.velocity.x,
+              y: 0 // Zero vertical velocity to eliminate bounce
+            });
+            
             // Store current platform for reference
             currentPlatformBody = platformBody;
             
             // Check platform type
             if (platformBody.label === 'platform') {
               onPlatformNow = true;
+              // Ensure zero bounce on platforms
+              playerBody.restitution = 0;
             } else if (platformBody.label === 'spring') {
               onSpringNow = true;
             } else if (platformBody.label === 'spike') {
@@ -282,10 +303,12 @@ export default function GameScreen({ route, navigation }) {
               treadmillSpeed = platformBody.treadmillSpeed || 4; // Use default value 4
               treadmillContacted = true;
               currentTreadmillSpeed = treadmillSpeed;
+              // Ensure zero bounce on treadmills
+              playerBody.restitution = 0;
               
               console.log(`Player contacted treadmill! Speed: ${treadmillSpeed}`);
             }
-          } else if (isPenetrating && overlapRatio < 0.5) {
+          } else if (isPenetrating && overlapRatio < 0.35) {
             // Player is penetrating but not enough overlap to be supported
             // Allow them to fall by not setting any platform flags
             console.log(`Player has insufficient overlap (${overlapRatio.toFixed(2)}) to be supported by platform`);
@@ -561,17 +584,16 @@ export default function GameScreen({ route, navigation }) {
           
           // Only apply spring effect if player is moving downward or stationary
           if (playerBody.velocity.y >= 0) {
-            // Strong upward bounce but with slower velocity
-            // Reduce vertical velocity for smoother jump
+            // Gentle upward bounce with slower velocity
             Matter.Body.setVelocity(playerBody, {
-              x: playerBody.velocity.x * 0.8, // Reduce horizontal momentum slightly
-              y: -12  // Reduced from -18 to -12 for slower but still high bounce
+              x: playerBody.velocity.x * 0.9, // Maintain most horizontal momentum
+              y: -8  // Reduced from -12 to -8 for much gentler bounce
             });
             
-            // Apply additional upward force for height but not speed
+            // Apply very gentle upward force
             Matter.Body.applyForce(playerBody, playerBody.position, {
               x: 0,
-              y: -0.02 // Gentle upward force for height
+              y: -0.01 // Reduced upward force
             });
             
             // Increase lives if below 10 (no cooldown for spring healing)
@@ -582,7 +604,7 @@ export default function GameScreen({ route, navigation }) {
           }
           
           // Set player properties for better spring effect
-          playerBody.restitution = 0.5;  // Reduced from 0.8 to 0.5 for smoother bouncing
+          playerBody.restitution = 0.3;  // Reduced from 0.5 to 0.3 for smoother, less bouncy effect
           
           console.log(`Spring applied velocity: ${JSON.stringify(playerBody.velocity)}`);
         }
