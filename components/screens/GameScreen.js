@@ -190,7 +190,7 @@ export default function GameScreen({ route, navigation }) {
           setGameOver(true);
           Alert.alert(
             "Game Over",
-            `Your lower body fell out of screen!\nYour score is: ${score}`,
+            `You lose, welcome to hell!`,
             [
               { text: "Return to Main Menu", onPress: () => navigation.navigate('MainScreen') }
             ]
@@ -204,7 +204,7 @@ export default function GameScreen({ route, navigation }) {
         setGameOver(true);
         Alert.alert(
           "Game Over",
-          `You fell out of screen!\nYour score is: ${score}`,
+          `You lose, welcome to hell!`,
           [
             { text: "Return to Main Menu", onPress: () => navigation.navigate('MainScreen') }
           ]
@@ -252,7 +252,7 @@ export default function GameScreen({ route, navigation }) {
           
           // If player's bottom is close to platform's top and there is sufficient overlap
           const verticalDistance = Math.abs(playerBottom - platformTop);
-          if (verticalDistance <= 5 && overlapRatio >= 0.3) {
+          if (verticalDistance <= 8 && overlapRatio >= 0.3) { // Increased tolerance to 8
             // Check platform type
             if (platformBody.label === 'platform') {
               onPlatformNow = true;
@@ -260,6 +260,7 @@ export default function GameScreen({ route, navigation }) {
               onSpringNow = true;
             } else if (platformBody.label === 'spike') {
               onSpikesNow = true;
+              playerBody.isTouchingSpike = true; // Ensure spike flag is set
             } else if (platformBody.label === 'treadmill') {
               onTreadmillNow = true;
               treadmillSpeed = platformBody.treadmillSpeed || 4; // Use default value 4
@@ -277,8 +278,9 @@ export default function GameScreen({ route, navigation }) {
                                     onSpikesNow ? 'spike' :
                                     onTreadmillNow ? 'treadmill' : 'none';
         
-        // Handle treadmill effect
+        // Handle treadmill effect if on treadmill
         if (onTreadmillNow && treadmillSpeed !== 0) {
+          console.log(`Applying treadmill effect with speed: ${treadmillSpeed}`);
           handleTreadmillEffect(treadmillSpeed);
         }
         
@@ -509,7 +511,7 @@ export default function GameScreen({ route, navigation }) {
               setGameOver(true);
               Alert.alert(
                 "Game Over",
-                `You lost all your lives!\nYour score is: ${score}`,
+                `You lose, welcome to hell!`,
                 [
                   { text: "Return to Main Menu", onPress: () => navigation.navigate('MainScreen') }
                 ]
@@ -540,7 +542,7 @@ export default function GameScreen({ route, navigation }) {
           // Set appropriate friction to prevent abnormally slow falling
           Matter.Body.set(playerBody, 'friction', 0);  // Completely remove friction
           Matter.Body.set(playerBody, 'frictionAir', 0); // Ensure no air resistance
-          Matter.Body.set(playerBody, 'density', 1);  // Set larger density for faster falling
+          Matter.Body.set(playerBody, 'density', 1.5);  // Increased density for faster falling
           
           // Add special handling function to prevent bouncing
           const preventBounce = () => {
@@ -567,15 +569,15 @@ export default function GameScreen({ route, navigation }) {
               // Ensure player can fall normally - reset all properties that might affect falling
               Matter.Body.set(playerBody, 'frictionAir', 0);
               Matter.Body.set(playerBody, 'friction', 0); // Completely remove friction
-              Matter.Body.set(playerBody, 'density', 1); // Increase density to ensure fast falling
+              Matter.Body.set(playerBody, 'density', 1.5); // Increased density for faster falling
               
               // Give initial downward velocity
               Matter.Body.setVelocity(playerBody, {
                 x: playerBody.velocity.x,
-                y: 5 // Increase initial downward speed
+                y: 8 // Increased initial downward speed
               });
             }
-          }, 5000);
+          }, 3000); // Reduced to 3 seconds
         }
         
         // Handle boundary collisions
@@ -620,7 +622,7 @@ export default function GameScreen({ route, navigation }) {
               return;
             }
             
-            // Otherwise just reduce lives
+            // Otherwise just reduce lives (lose blood when touching top boundary)
             setLives((prev) => {
               const newLives = Math.max(0, prev - 1);
               if (newLives <= 0 && !gameOver) {
@@ -907,14 +909,14 @@ export default function GameScreen({ route, navigation }) {
       // Only handle horizontal movement, don't affect vertical movement
       if (playerBody.velocity.x !== 0) {
         // Player is moving, give stronger push effect
-        const pushEffect = speed * 0.3; // Increased to 0.3 for stronger effect
+        const pushEffect = speed * 0.4; // Increased to 0.4 for even stronger effect
         Matter.Body.applyForce(playerBody, playerBody.position, {
-          x: pushEffect * 0.0005, // Increased to 0.0005
+          x: pushEffect * 0.0008, // Increased to 0.0008
           y: 0
         });
       } else {
         // Player is stationary, set initial velocity
-        targetVelocityX = speed * 1; // Increased to 1.0 for stronger effect
+        targetVelocityX = speed * 1.5; // Increased to 1.5 for stronger effect
         
         Matter.Body.setVelocity(playerBody, {
           x: targetVelocityX,
