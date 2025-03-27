@@ -14,12 +14,11 @@ import createPlatform from '../entities/Platform';
 import createSpike from '../entities/Spike';
 import createSpring from '../entities/Spring';
 import createTreadmill from '../entities/Treadmill';
-import createPlayer from '../entities/Player'; // Updated Player entity
+import createPlayer from '../entities/Player';
 
 const { width, height } = Dimensions.get('window');
 
 export default function GameScreen({ route, navigation }) {
-  // Safely handle route.params with a fallback
   const selectedPlayer = route?.params?.selectedPlayer || 'DefaultPlayer';
   const [lives, setLives] = useState(10);
   const [entities, setEntities] = useState(null);
@@ -65,20 +64,28 @@ export default function GameScreen({ route, navigation }) {
     const world = engine.world;
     
     const boundaries = createBoundaries(world);
+
+    // 創建初始平台（在畫面上方約1/3處）
+    const startPlatform = createPlatform(world, width / 2, height * 0.3);
+
+    // 創建其他遊戲元素（位置調整到更下方）
     const platform = createPlatform(world, width / 2, height - 200);
     const spike = createSpike(world, width / 2, height - 230);
     const spring = createSpring(world, width / 2 - 100, height - 250);
     const treadmill = createTreadmill(world, width / 2 + 100, height - 180, -1);
-    const player = createPlayer(world, width / 2, height - 300, selectedPlayer); // Pass selectedPlayer
+
+    // 創建玩家（位置在初始平台上方一點）
+    const player = createPlayer(world, width / 2, height * 0.3 - 50, selectedPlayer);
     
     const gameEntities = {
       physics: { engine, world },
       ...boundaries,
-      platform1: platform || {},
-      spike1: spike || {},
-      spring1: spring || {},
-      treadmill1: treadmill || {},
-      player1: player || {},
+      startPlatform: startPlatform,
+      platform1: platform,
+      spike1: spike,
+      spring1: spring,
+      treadmill1: treadmill,
+      player1: player,
     };
     
     setEntities(gameEntities);
@@ -87,7 +94,7 @@ export default function GameScreen({ route, navigation }) {
       Matter.World.clear(world);
       Matter.Engine.clear(engine);
     };
-  }, [selectedPlayer]); // Re-run if selectedPlayer changes
+  }, [selectedPlayer]);
 
   useEffect(() => {
     const engine = engineRef.current;
