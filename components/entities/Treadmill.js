@@ -4,33 +4,42 @@ import { Dimensions } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
-const createTreadmill = (world, x, y, direction = 1) => {
+const createTreadmill = (world, posX, posY, speed = 4) => {
   const treadmill = Matter.Bodies.rectangle(
-    x, y, 100, 20,
+    posX, 
+    posY, 
+    100, 
+    20, 
     { 
-      isStatic: true, 
+      isStatic: true,
+      friction: 1,       // Maximum friction
+      restitution: 0,    // Completely remove elasticity
+      slop: 0,           // Completely remove object overlap processing threshold
       label: 'treadmill', 
-      friction: 0.1,
-      treadmillSpeed: direction  // 保存速度信息在 body 上
+      isSensor: false,   // Ensure it's not a sensor
+      chamfer: { radius: 0 }, // Remove rounded corners
+      collisionFilter: {
+        category: 0x0002,
+        mask: 0xFFFFFFFF,
+        group: 1         // Ensure objects in the same group can collide
+      },
+      density: 1000,     // Increase density to make it more "solid"
+      treadmillSpeed: speed, // Set speed directly in object properties
+      frictionAir: 0     // Set to 0 to prevent air resistance
     }
   );
   
+  console.log(`Creating treadmill: Position(${posX}, ${posY}), Speed: ${speed}, Size: 100x20`);
+  
   Matter.World.add(world, treadmill);
-  
-  // Get the engine from world
-  const engine = world.engine;
-  
-  if (engine) {
-    Matter.Events.on(engine, 'beforeUpdate', () => {
-      Matter.Body.translate(treadmill, { x: 0.5 * direction, y: 0 });
-    });
-  }
   
   return {
     body: treadmill,
     size: [100, 20],
-    color: 'yellow',
+    color: 'yellow',      // Treadmill is yellow
     renderer: RenderEntity,
+    label: 'treadmill',   // Ensure the entity object also has a label
+    treadmillSpeed: speed // Also store speed in the entity
   };
 };
 
