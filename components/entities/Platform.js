@@ -1,23 +1,21 @@
 import Matter from 'matter-js';
 import RenderEntity from '../RenderEntity';
-import { getRandomColor } from '../../utils/helpers';
+import { Dimensions } from 'react-native';
 
-const createPlatform = (world, x, y, width = 100, height = 20) => {
+const { width } = Dimensions.get('window');
+
+const createPlatform = (world, posX, posY) => {
   const platform = Matter.Bodies.rectangle(
-    x,
-    y,
-    width,
-    height,
+    posX, 
+    posY, 
+    100, 
+    20, 
     { 
       isStatic: true,
-      friction: 1.0,       // High friction for stability
-      restitution: 0,      // No bounce at all
-      label: 'platform',
-      slop: 0,             // No slop for precise contact
-      collisionFilter: {
-        category: 0x0002,
-        mask: 0xFFFFFFFF
-      }
+      friction: 1,  // 增加摩擦力，防止玩家滑動
+      restitution: 0,  // 完全去除彈性
+      slop: 0,  // 減少物體重疊的處理閾值，設為0以獲得更精確的碰撞
+      label: 'platform'  // 確保平台有正確的標籤
     }
   );
 
@@ -25,9 +23,10 @@ const createPlatform = (world, x, y, width = 100, height = 20) => {
 
   return {
     body: platform,
-    size: [width, height],
-    color: getRandomColor(),
-    renderer: RenderEntity
+    size: [100, 20],
+    color: 'grey',
+    renderer: RenderEntity,
+    label: 'platform'  // 確保實體對象也有標籤
   };
 };
 
