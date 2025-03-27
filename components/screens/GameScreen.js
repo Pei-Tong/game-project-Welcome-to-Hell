@@ -309,6 +309,19 @@ export default function GameScreen({ route, navigation }) {
               x: 0,
               y: 0  // Also set vertical velocity to 0 to prevent bouncing
             });
+          } else if (currentPlatformType === 'treadmill') {
+            // On treadmill, let the treadmill effect handle velocity
+            // Don't modify velocity here as it's managed by handleTreadmillEffect
+            console.log('On treadmill - velocity controlled by treadmill effect');
+          } else if (currentPlatformType === 'spring') {
+            // Spring effect is handled in collision handler
+            console.log('On spring - spring effect handled in collision');
+          } else if (currentPlatformType === 'spike') {
+            // On spike, don't move
+            Matter.Body.setVelocity(playerBody, {
+              x: 0,
+              y: 0
+            });
           } else if (!playerBody.isTouchingSpike) {
             // On other non-spike platforms apply friction
             const friction = 0.4;  // Increase friction for more natural stopping
@@ -341,8 +354,8 @@ export default function GameScreen({ route, navigation }) {
     });
     
     // Set physics world parameters - increase gravity to make player feel heavier
-    engine.gravity.scale = 0.01;  // Increased gravity scale from 0.005 to 0.01
-    engine.gravity.y = 1;          // Keep gravity pointing downward
+    engine.gravity.scale = 0.015;  // Increased gravity scale from 0.01 to 0.015
+    engine.gravity.y = 1.2;        // Increased gravity direction from a value of 1 to 1.2
     
     engineRef.current = engine;
     
@@ -420,7 +433,10 @@ export default function GameScreen({ route, navigation }) {
     
     // Create player above first platform, increase mass for more weight feel
     const player = createPlayer(world, width / 2, firstPlatformY - 50, selectedPlayer);
-    player.body.mass = player.body.mass * 3;  // Greatly increase player mass, from 1.5x to 3x
+    player.body.mass = player.body.mass * 5;  // Greatly increase player mass from 3x to 5x
+    player.body.restitution = 0;  // Set player restitution to 0 by default
+    player.body.friction = 0.3;   // Add some friction
+    player.body.frictionAir = 0.01; // Add small air friction
     initialEntities.player1 = player;
 
     setEntities(initialEntities);
@@ -484,6 +500,35 @@ export default function GameScreen({ route, navigation }) {
           
           // Set player restitution coefficient to 0
           playerBody.restitution = 0;
+        }
+        
+        // Handle the spring effect
+        if ((bodyA.label === 'player' && bodyB.label === 'spring') ||
+            (bodyA.label === 'spring' && bodyB.label === 'player')) {
+          const playerBody = bodyA.label === 'player' ? bodyA : bodyB;
+          const springBody = bodyA.label === 'spring' ? bodyA : bodyB;
+          
+          console.log('Player collision with spring started!');
+          
+          // Only apply spring effect if player is moving downward or stationary
+          if (playerBody.velocity.y >= 0) {
+            // Strong upward bounce
+            Matter.Body.setVelocity(playerBody, {
+              x: playerBody.velocity.x,
+              y: -18  // Very strong upward bounce
+            });
+            
+            // Increase lives if below 10 (no cooldown for spring healing)
+            if (lives < 10) {
+              setLives(prev => Math.min(prev + 1, 10));
+              console.log('Healed 1 life from spring jump!');
+            }
+          }
+          
+          // Set player properties for better spring effect
+          playerBody.restitution = 0.8;  // Add some elasticity for spring
+          
+          console.log(`Spring applied velocity: ${JSON.stringify(playerBody.velocity)}`);
         }
         
         // Handle collision with spike
@@ -903,26 +948,36 @@ export default function GameScreen({ route, navigation }) {
     const playerBody = entities.player1.body;
     
     if (playerBody) {
-      // Set horizontal velocity directly
-      let targetVelocityX = 0;
+      console.log(`Applying treadmill effect with speed ${speed}. Current player velocity: ${JSON.stringify(playerBody.velocity)}`);
       
-      // Only handle horizontal movement, don't affect vertical movement
-      if (playerBody.velocity.x !== 0) {
-        // Player is moving, give stronger push effect
-        const pushEffect = speed * 0.4; // Increased to 0.4 for even stronger effect
-        Matter.Body.applyForce(playerBody, playerBody.position, {
-          x: pushEffect * 0.0008, // Increased to 0.0008
-          y: 0
-        });
-      } else {
-        // Player is stationary, set initial velocity
-        targetVelocityX = speed * 1.5; // Increased to 1.5 for stronger effect
-        
+      // Directly apply treadmill effect regardless of player's current state
+      // This ensures the effect is always applied
+      
+      // Set horizontal velocity directly based on treadmill speed
+      const treadmillForceX = speed * 0.01; // Convert speed to appropriate force magnitude
+      
+      // Apply force in direction of treadmill movement
+      Matter.Body.applyForce(playerBody, playerBody.position, {
+        x: treadmillForceX,
+        y: 0
+      });
+      
+      // If player was stationary, give them an initial push
+      if (Math.abs(playerBody.velocity.x) < 0.1) {
         Matter.Body.setVelocity(playerBody, {
-          x: targetVelocityX,
+          x: speed * 0.5, // Give initial velocity in treadmill direction
           y: playerBody.velocity.y
         });
+        console.log(`Applied initial treadmill velocity: ${speed * 0.5}`);
       }
+      
+      // Ensure vertical velocity is zero to prevent bouncing
+      Matter.Body.setVelocity(playerBody, {
+        x: playerBody.velocity.x,
+        y: 0
+      });
+      
+      console.log(`After treadmill effect, player velocity: ${JSON.stringify(playerBody.velocity)}`);
     }
   };
 
