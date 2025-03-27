@@ -10,7 +10,7 @@ const createPlatform = (world, x, y) => {
     y,
     100,
     20,
-    { isStatic: true }
+    { isStatic: true, label: 'platform' }
   );
 
   Matter.World.add(world, platform);

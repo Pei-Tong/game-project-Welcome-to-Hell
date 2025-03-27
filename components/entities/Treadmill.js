@@ -7,7 +7,12 @@ const { width } = Dimensions.get('window');
 const createTreadmill = (world, x, y, direction = 1) => {
   const treadmill = Matter.Bodies.rectangle(
     x, y, 100, 20,
-    { isStatic: true, label: 'treadmill', friction: 0.1 }
+    { 
+      isStatic: true, 
+      label: 'treadmill', 
+      friction: 0.1,
+      treadmillSpeed: direction  // 保存速度信息在 body 上
+    }
   );
   
   Matter.World.add(world, treadmill);
