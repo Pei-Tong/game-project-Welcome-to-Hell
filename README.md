@@ -6,22 +6,7 @@ This is a stable version of our NS-Shaft inspired mobile game project, preserved
 
 Below is a demonstration of the NS-Shaft: Welcome to Hell gameplay:
 
-<!-- Option 1: Direct GIF embed -->
-<!-- ![Gameplay Demo](assets/gameplay-demo.gif) -->
-
-<!-- Option 2: YouTube video link -->
-<!-- [![Gameplay Demo](https://img.youtube.com/vi/YOUR_VIDEO_ID/0.jpg)](https://www.youtube.com/watch?v=YOUR_VIDEO_ID) -->
-
-<!-- Option 3: GitHub video file reference -->
-<!-- For GitHub video file, upload your video to the repository and reference it like this: -->
-<!-- 
-<video width="640" height="360" controls>
-  <source src="assets/gameplay-demo.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
--->
-
-<!-- To implement any of these options, remove the comments and replace the placeholder paths with your actual video file paths or IDs -->
+![Gameplay Demo](assets/Welcome%20to%20Hell_Demo.gif)
 
 ## Game Concept
 
@@ -82,6 +67,7 @@ The game features a dark, fiery aesthetic with:
 
 - Inspired by the classic NS-Shaft game
 - Original "Welcome to Hell" concept and implementation by the Mobile Game Development Team
+- Developed in collaboration with Oyelowo Mujirat and Maharjan Binita
 - Physics engine: Matter.js
 - Game engine: React Native Game Engine
 
