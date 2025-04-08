@@ -12,12 +12,6 @@ Below are demonstrations of the NS-Shaft: Welcome to Hell gameplay:
   <img src="assets/Welcome%20to%20Hell_Demo.gif" alt="Gameplay Demo" height="400" />
 </p>
 
-### Gameplay Video
-
-Check out our gameplay video on YouTube:
-
-[![NS-Shaft: Welcome to Hell Gameplay](https://img.youtube.com/vi/cBEKJcf4EuU/0.jpg)](https://www.youtube.com/shorts/cBEKJcf4EuU?feature=share)
-
 ## Game Concept
 
 NS-Shaft: Welcome to Hell is based on the classic NS-Shaft game concept, where players must navigate downward through a series of platforms while avoiding hazards. In our version, the player descends through the layers of hell, facing increasingly challenging obstacles.
