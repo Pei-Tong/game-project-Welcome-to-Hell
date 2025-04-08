@@ -23,14 +23,14 @@ const { width, height } = Dimensions.get('window');
 
 // Game constants
 const SCROLL_SPEED = -1.8;        // Increased scroll speed from -1.0 to -1.8
-const PLATFORM_GAP_MIN = 70;      // Minimum vertical gap between platforms
-const PLATFORM_GAP_MAX = 170;     // Maximum vertical gap between platforms
+const PLATFORM_GAP_MIN = 100;      // 將最小間隔從70調整為100，大於玩家高度（80像素）
+const PLATFORM_GAP_MAX = 200;     // 將最大間隔從170調整為200，確保足夠間距
 const PLATFORM_WIDTH = 100;       // Platform width
 const INITIAL_PLATFORMS = 8;      // Initial number of platforms
 const PLATFORM_TYPES = ['platform', 'treadmill', 'spring', 'spike']; // Platform types
 const PLATFORM_WEIGHTS = [40, 25, 20, 15]; // Weights for each platform type generation, for more balanced distribution
 const FIREBALL_SPAWN_INTERVAL = 2000; // More frequent fireball generation (every 2 seconds)
-const FIREBALL_DAMAGE = 3; // Fireball damage
+const FIREBALL_DAMAGE = 3; // Fireball damage - 確保火球傷害為3點
 const FIREBALL_MIN_SPEED = 6; // Fireball minimum falling speed
 const FIREBALL_MAX_SPEED = 10; // Fireball maximum falling speed
 
@@ -340,7 +340,9 @@ export default function GameScreen({ route, navigation }) {
       const playerBody = entities.player1.body;
       
       // 檢查玩家是否超出底部螢幕邊界(觸發遊戲結束)
-      if (playerBody.position.y > height + 100) {
+      // 降低檢測門檻，只要玩家位置超過螢幕高度就結束遊戲
+      if (playerBody.position.y > height + 50) {
+        console.log('Player fell out of bounds, game over!');
         setGameOver(true);
         Alert.alert(
           "Game Over",
@@ -415,11 +417,68 @@ export default function GameScreen({ route, navigation }) {
               onPlatformNow = true;
               // Ensure zero bounce on platforms
               playerBody.restitution = 0;
+              
+              // 當碰撞到普通平台時回血1滴 - 只在首次接觸時執行
+              const currentTime = Date.now();
+              if (currentTime - lastDamageTime > 1000 && !playerBody.lastPlatformId) {
+                // 回血1滴，同時確保不超過最大生命值10
+                setLives(prev => Math.min(10, prev + 1));
+                setLastDamageTime(currentTime);
+                console.log("Player landed on platform, healing 1 HP");
+                
+                // 記錄當前平台ID，防止再次觸發回血
+                playerBody.lastPlatformId = platformBody.id || Date.now();
+              }
+              
             } else if (platformBody.label === 'spring') {
               onSpringNow = true;
+              
+              // 實現慢速彈跳效果 - 增強彈跳力量確保明顯的彈跳
+              // 實現回血效果：每次接觸彈簧回血1滴
+              Matter.Body.setVelocity(playerBody, {
+                x: playerBody.velocity.x,
+                y: -6  // 增加向上力量，確保明顯的彈跳效果
+              });
+              
+              // 確保不會連續多次回血，但使回血機制更明確（即每次彈跳都算一次）
+              const currentTime = Date.now();
+              // 減少時間間隔到800毫秒，以確保每次彈跳都能觸發回血
+              if (currentTime - lastDamageTime > 800) {
+                // 回血1滴，同時確保不超過最大生命值10
+                setLives(prev => Math.min(10, prev + 1));
+                setLastDamageTime(currentTime);
+                console.log("Player bounced on spring, healing 1 HP");
+                
+                // 提供視覺反饋，讓玩家知道已回血
+                playerBody.springBounceTime = currentTime;
+              }
+              
             } else if (platformBody.label === 'spike') {
               onSpikesNow = true;
               playerBody.isTouchingSpike = true; // Ensure spike flag is set
+              
+              // 碰撞到尖刺時扣2滴血且最多只扣2滴
+              const currentTime = Date.now();
+              // 確保不是連續扣血，設置冷卻時間1秒
+              if (currentTime - lastDamageTime > 1000) {
+                // 扣2滴血
+                setLives(prev => Math.max(0, prev - 2));
+                setLastDamageTime(currentTime);
+                console.log("Player hit spike, lost 2 HP");
+                
+                // 如果生命值降為0，結束遊戲
+                if (lives <= 2 && !gameOver) {
+                  setGameOver(true);
+                  Alert.alert(
+                    "Game Over",
+                    `You lost, welcome to hell! Your score: ${score}`,
+                    [
+                      { text: "Return to Main Menu", onPress: () => navigation.navigate('MainScreen') }
+                    ]
+                  );
+                }
+              }
+              
             } else if (platformBody.label === 'treadmill') {
               onTreadmillNow = true;
               treadmillSpeed = platformBody.treadmillSpeed || 4; // Use default value 4
@@ -457,6 +516,11 @@ export default function GameScreen({ route, navigation }) {
         if (onTreadmillNow && treadmillSpeed !== 0) {
           console.log(`Applying treadmill effect with speed: ${treadmillSpeed}`);
           handleTreadmillEffect(playerBody, currentPlatformBody, treadmillSpeed);
+        }
+        
+        // 如果玩家不在平台上，重置lastPlatformId
+        if (!isOnPlatform) {
+          playerBody.lastPlatformId = null;
         }
         
         return { isOnPlatform, currentPlatformType, currentPlatformBody };
@@ -500,9 +564,15 @@ export default function GameScreen({ route, navigation }) {
       const visibleBottomEdge = screenBottomY + 200;  // Add platform slightly further below visible area
       
       if (lowestPlatformRef.current < visibleBottomEdge) {
-        const newPlatformY = lowestPlatformRef.current + (PLATFORM_GAP_MIN + Math.random() * (PLATFORM_GAP_MAX - PLATFORM_GAP_MIN));
-        const newPlatform = createRandomPlatform(engine.world, newPlatformY);
+        const previousY = lowestPlatformRef.current;
+        const newPlatformY = previousY + (PLATFORM_GAP_MIN + Math.random() * (PLATFORM_GAP_MAX - PLATFORM_GAP_MIN));
+        
+        // 確保新增平台的垂直間距至少是玩家高度的1.2倍，以避免卡住
+        const adjustedY = Math.max(newPlatformY, previousY + 100);
+        
+        const newPlatform = createRandomPlatform(engine.world, adjustedY);
         Object.assign(entities, newPlatform);
+        lowestPlatformRef.current = adjustedY;
       }
     }
 
@@ -566,7 +636,13 @@ export default function GameScreen({ route, navigation }) {
     
     // First ensure each type is present at least once
     for (let i = 0; i < forcedTypes.length; i++) {
+      const previousY = lastY;
       lastY += (PLATFORM_GAP_MIN + Math.random() * (PLATFORM_GAP_MAX - PLATFORM_GAP_MIN));
+      
+      // 確保平台垂直間距至少是玩家高度的1.2倍，以避免卡住
+      if (i > 0 && lastY - previousY < 100) {
+        lastY = previousY + 100; // 確保最小間距為100像素
+      }
       
       let platform;
       const x = Math.random() * (width - PLATFORM_WIDTH) + PLATFORM_WIDTH / 2;
