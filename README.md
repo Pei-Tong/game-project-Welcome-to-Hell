@@ -4,15 +4,12 @@ This is a stable version of our NS-Shaft inspired mobile game project, preserved
 
 ## Game Demo
 
-Below is a demonstration of the NS-Shaft: Welcome to Hell gameplay:
-
-![Gameplay Demo](assets/Welcome%20to%20Hell_Demo.gif)
-
-### Game Screenshots
+Below are demonstrations of the NS-Shaft: Welcome to Hell gameplay:
 
 <p align="center">
-  <img src="assets/Welcome%20to%20Hell_Demo1.png" alt="Character Selection Screen" width="300" />
-  <img src="assets/Welcome%20to%20Hell_Demo2.png" alt="Gameplay Screen" width="300" />
+  <img src="assets/Welcome%20to%20Hell_Demo1.png" alt="Character Selection Screen" width="250" />
+  <img src="assets/Welcome%20to%20Hell_Demo.gif" alt="Gameplay Demo" width="250" />
+  <img src="assets/Welcome%20to%20Hell_Demo2.png" alt="Gameplay Screen" width="250" />
 </p>
 
 ## Game Concept
