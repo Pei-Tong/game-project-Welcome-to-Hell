@@ -1,8 +1,37 @@
 import Matter from 'matter-js';
-import RenderEntity from '../RenderEntity';
+import React from 'react';
+import { View, Image } from 'react-native';
 import { Dimensions } from 'react-native';
 
 const { width } = Dimensions.get('window');
+
+// Custom renderer for Treadmill with image
+const TreadmillRenderer = ({ body, size }) => {
+  const { position } = body;
+  const width = size[0];
+  const height = size[1];
+  const x = body.position.x - width / 2;
+  const y = body.position.y - height / 2;
+
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        left: x,
+        top: y,
+        width: width,
+        height: height,
+        backgroundColor: 'transparent',
+        overflow: 'hidden',
+      }}
+    >
+      <Image
+        source={require('../../assets/img/mill.png')}
+        style={{ width: width, height: height, resizeMode: 'stretch' }}
+      />
+    </View>
+  );
+};
 
 const createTreadmill = (world, posX, posY, speed = 4) => {
   // Ensure speed is a significant value
@@ -39,8 +68,7 @@ const createTreadmill = (world, posX, posY, speed = 4) => {
   return {
     body: treadmill,
     size: [100, 20],
-    color: 'yellow',      // Treadmill is yellow
-    renderer: RenderEntity,
+    renderer: TreadmillRenderer,  // Now using custom renderer with image
     label: 'treadmill',   // Ensure the entity object also has a label
     treadmillSpeed: effectiveSpeed // Also store speed in the entity
   };

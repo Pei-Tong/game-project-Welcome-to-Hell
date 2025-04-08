@@ -1,8 +1,37 @@
 import Matter from 'matter-js';
-import RenderEntity from '../RenderEntity';
+import React from 'react';
+import { View, Image } from 'react-native';
 import { Dimensions } from 'react-native';
 
 const { width } = Dimensions.get('window');
+
+// Custom renderer for Spring with image
+const SpringRenderer = ({ body, size }) => {
+  const { position } = body;
+  const width = size[0];
+  const height = size[1];
+  const x = body.position.x - width / 2;
+  const y = body.position.y - height / 2;
+
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        left: x,
+        top: y,
+        width: width,
+        height: height,
+        backgroundColor: 'transparent',
+        overflow: 'hidden',
+      }}
+    >
+      <Image
+        source={require('../../assets/img/spring.png')}
+        style={{ width: width, height: height, resizeMode: 'stretch' }}
+      />
+    </View>
+  );
+};
 
 const createSpring = (world, x, y) => {
   const spring = Matter.Bodies.rectangle(
@@ -32,8 +61,7 @@ const createSpring = (world, x, y) => {
   return {
     body: spring,
     size: [100, 20],
-    color: 'green',
-    renderer: RenderEntity,
+    renderer: SpringRenderer,  // Now using custom renderer with image
     label: 'spring'   // Ensure label is properly set
   };
 };
