@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   Dimensions,
   View,
-  Alert
+  Alert,
+  Image
 } from 'react-native';
 import { GameEngine } from 'react-native-game-engine';
 import Matter from 'matter-js';
@@ -16,6 +17,7 @@ import createSpike from '../entities/Spike';
 import createSpring from '../entities/Spring';
 import createTreadmill from '../entities/Treadmill';
 import createPlayer from '../entities/Player';
+import createFireball from '../entities/Fireball';
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,6 +29,10 @@ const PLATFORM_WIDTH = 100;       // Platform width
 const INITIAL_PLATFORMS = 8;      // Initial number of platforms
 const PLATFORM_TYPES = ['platform', 'treadmill', 'spring', 'spike']; // Platform types
 const PLATFORM_WEIGHTS = [40, 25, 20, 15]; // Weights for each platform type generation, for more balanced distribution
+const FIREBALL_SPAWN_INTERVAL = 2000; // More frequent fireball generation (every 2 seconds)
+const FIREBALL_DAMAGE = 3; // Fireball damage
+const FIREBALL_MIN_SPEED = 6; // Fireball minimum falling speed
+const FIREBALL_MAX_SPEED = 10; // Fireball maximum falling speed
 
 export default function GameScreen({ route, navigation }) {
   const selectedPlayer = route?.params?.selectedPlayer || 'DefaultPlayer';
@@ -45,6 +51,8 @@ export default function GameScreen({ route, navigation }) {
   const scrollPositionRef = useRef(0);
   const lowestPlatformRef = useRef(0);  // Changed from highest platform to lowest platform
   const lastScoreUpdateRef = useRef(Date.now());  // Used for score calculation time reference
+  const lastFireballSpawnRef = useRef(0); // Last time a fireball was generated
+  const fireballsRef = useRef({}); // Store references to all fireballs
   
   // Add refs for treadmill state
   const treadmillContactedRef = useRef(false);
@@ -152,19 +160,173 @@ export default function GameScreen({ route, navigation }) {
       lastScoreUpdateRef.current = currentTime;
     }
 
+    // Fireball generation logic
+    const fireballSpawnElapsed = currentTime - lastFireballSpawnRef.current;
+    if (fireballSpawnElapsed >= FIREBALL_SPAWN_INTERVAL && !isPaused && !gameOver) {
+      try {
+        // Choose a random position at the top boundary to spawn a fireball
+        const spawnX = Math.random() * (width - 60) + 30; // Avoid spawning at the extreme edges
+        const spawnY = 30; // Spawn below the top boundary
+        
+        // Use the new fireball creation method
+        const fireball = createFireball(null, spawnX, spawnY);
+        
+        // Directly add the fireball to the entities list
+        if (fireball) {
+          const fireballId = `fireball_${Date.now()}_${Math.random()}`;
+          fireballsRef.current[fireballId] = fireball;
+          entities[fireballId] = fireball;
+          
+          // Set random velocity
+          fireball.velocity.y = FIREBALL_MIN_SPEED + 
+            Math.random() * (FIREBALL_MAX_SPEED - FIREBALL_MIN_SPEED);
+          
+          // Update the last spawn time
+          lastFireballSpawnRef.current = currentTime;
+          
+          console.log(`Generated new fireball, position: (${spawnX}, ${spawnY}), speed: ${fireball.velocity.y}`);
+        }
+      } catch (error) {
+        console.error('Error generating fireball:', error);
+      }
+    }
+    
+    // Update all fireballs and detect collisions
+    const fireballKeys = Object.keys(fireballsRef.current || {});
+    for (let i = 0; i < fireballKeys.length; i++) {
+      const key = fireballKeys[i];
+      const fireball = fireballsRef.current[key];
+      
+      if (!fireball) continue;
+      
+      // Update fireball position
+      fireball.update();
+      
+      // Check if the fireball is below the screen bottom
+      if (fireball.position.y > height + 50) {
+        delete fireballsRef.current[key];
+        delete entities[key];
+        continue;
+      }
+      
+      // Detect collision with player
+      if (entities.player1 && fireball.collidesWith(entities.player1)) {
+        // Handle collision
+        // Check cooldown time
+        if (currentTime - lastDamageTime < 1000) continue;
+        
+        // Update damage time
+        setLastDamageTime(currentTime);
+        
+        // Handle collision consequences
+        console.log(`Player hit by fireball ${key}`);
+        
+        // Deduct lives
+        setLives((prev) => {
+          const newLives = Math.max(0, prev - FIREBALL_DAMAGE);
+          if (newLives <= 0 && !gameOver) {
+            setGameOver(true);
+            Alert.alert(
+              "Game Over",
+              `You lost, welcome to hell! Your score: ${score}`,
+              [
+                { text: "Return to Main Menu", onPress: () => navigation.navigate('MainScreen') }
+              ]
+            );
+          } else if (entities.player1.body) {
+            // Visual feedback - player bounces slightly when hit by a fireball
+            Matter.Body.setVelocity(entities.player1.body, {
+              x: entities.player1.body.velocity.x,
+              y: -3 // Enhanced upward bounce effect
+            });
+          }
+          return newLives;
+        });
+        
+        // Remove fireball
+        delete fireballsRef.current[key];
+        delete entities[key];
+        continue;
+      }
+      
+      // Detect collision with platforms
+      let platformCollision = false;
+      Object.keys(platformsRef.current || {}).forEach(platformKey => {
+        const platform = platformsRef.current[platformKey];
+        if (platform && fireball.collidesWithPlatform(platform)) {
+          // Collision occurred, remove fireball
+          delete fireballsRef.current[key];
+          delete entities[key];
+          platformCollision = true;
+          console.log('Fireball hit platform, removed');
+        }
+      });
+      
+      if (platformCollision) continue;
+    }
+
+    // Check every frame to clear all old devil horns
+    const allBodies = Matter.Composite.allBodies(engine.world);
+    for (let i = 0; i < allBodies.length; i++) {
+      const body = allBodies[i];
+      if (body.label === 'devilHorn') {
+        // Debug logging
+        console.log('Found old devil horn in world, removing...');
+        // Remove from physics world
+        Matter.World.remove(engine.world, body);
+      }
+    }
+
     // Handle screen scrolling
     scrollPositionRef.current += SCROLL_SPEED;
     
-    // Scroll all entities
+    // 處理實體滾動，但確保邊界和固定元素不滾動
     Object.keys(entities).forEach(key => {
       const entity = entities[key];
-      if (entity.body && key !== 'player1' && key !== 'physics' && 
-          key !== 'leftBoundary' && key !== 'rightBoundary' && 
-          key !== 'topBoundary' && key !== 'bottomBoundary' &&
-          key !== 'leftHead' && key !== 'rightHead' && key !== 'fireball') {
+      
+      // 跳過固定在螢幕上的元素
+      if (entity.isScreenFixed) {
+        return;
+      }
+      
+      // 跳過所有邊界實體 - 確保它們完全不參與滾動
+      if (key.includes('Boundary') || 
+          (entity.body && 
+           (entity.body.label === 'topBoundary' || 
+            entity.body.label === 'leftBoundary' || 
+            entity.body.label === 'rightBoundary'))) {
+        return;
+      }
+      
+      // 跳過火球實體 - 確保火球不受滾動影響
+      if (entity.isFireball || (entity.body && entity.body.label === 'fireball')) {
+        // 確保火球有正確的向下速度
+        if (entity.body) {
+          // 如果火球沒有向下移動或速度太慢，施加額外的向下力
+          if (entity.body.velocity.y < 3) {
+            Matter.Body.setVelocity(entity.body, {
+              x: entity.body.velocity.x,
+              y: 5 // 確保有足夠的向下速度
+            });
+          }
+        }
+        return;
+      }
+      
+      // 清除舊的魔鬼角實體
+      if (key.includes('leftHead') || key.includes('rightHead') || entity.isDevilHorn) {
+        if (entity.body) {
+          Matter.World.remove(engine.world, entity.body);
+        }
+        delete entities[key];
+        return;
+      }
+      
+      // 常規實體滾動
+      if (entity.body && key !== 'player1' && key !== 'physics') {
         Matter.Body.translate(entity.body, { x: 0, y: SCROLL_SPEED });
         
-        // If platform moves out of top screen, remove it
+        // 如果平台移出螢幕頂部，移除它
         if (entity.body.position.y < -100) {
           delete platformsRef.current[key];
           Matter.World.remove(engine.world, entity.body);
@@ -173,11 +335,11 @@ export default function GameScreen({ route, navigation }) {
       }
     });
     
-    // Ensure player doesn't scroll
+    // 確保玩家不滾動
     if (entities.player1) {
       const playerBody = entities.player1.body;
       
-      // Check if player is out of bottom screen boundary (trigger game over)
+      // 檢查玩家是否超出底部螢幕邊界(觸發遊戲結束)
       if (playerBody.position.y > height + 100) {
         setGameOver(true);
         Alert.alert(
@@ -366,6 +528,15 @@ export default function GameScreen({ route, navigation }) {
     
     const world = engine.world;
     
+    // 清除所有可能存在的舊魔鬼角實體
+    let existingBodies = Matter.Composite.allBodies(world);
+    for (let i = 0; i < existingBodies.length; i++) {
+      const body = existingBodies[i];
+      if (body.label === 'leftHead' || body.label === 'rightHead' || body.isDevilHorn) {
+        Matter.World.remove(world, body);
+      }
+    }
+    
     // Initialize platforms and player
     platformsRef.current = {};
     scrollPositionRef.current = 0;
@@ -439,6 +610,7 @@ export default function GameScreen({ route, navigation }) {
     setEntities(initialEntities);
     
     return () => {
+      // 完全清空世界和引擎
       Matter.World.clear(world);
       Matter.Engine.clear(engine);
     };
@@ -453,266 +625,36 @@ export default function GameScreen({ route, navigation }) {
     }
     
     const collisionStartHandler = (event) => {
-      if (!event || !event.pairs) {
-        console.error('Event or event.pairs is undefined!');
-        return;
-      }
+      let pairs = event.pairs;
       
-      event.pairs.forEach((pair) => {
+      pairs.forEach((pair) => {
         const { bodyA, bodyB } = pair;
         
-        // Handle treadmill collision
-        if ((bodyA.label === 'player' && bodyB.label === 'treadmill') ||
-            (bodyA.label === 'treadmill' && bodyB.label === 'player')) {
-          const playerBody = bodyA.label === 'player' ? bodyA : bodyB;
-          const treadmillBody = bodyA.label === 'treadmill' ? bodyA : bodyB;
-          
-          console.log('Player and treadmill collision started!');
-          
-          // Force player to stand on treadmill
-          const treadmillTop = treadmillBody.bounds.min.y;
-          Matter.Body.setPosition(playerBody, {
-            x: playerBody.position.x,
-            y: treadmillTop - (playerBody.bounds.max.y - playerBody.bounds.min.y) / 2 - 2  // Move slightly up to prevent penetration
-          });
-          
-          // Stop player vertical speed
-          Matter.Body.setVelocity(playerBody, {
-            x: playerBody.velocity.x,
-            y: 0
-          });
-          
-          // Mark player touching treadmill
-          playerBody.isTouchingTreadmill = true;
-          playerBody.currentTreadmill = treadmillBody;
+        // Skip if one of the bodies is not valid anymore
+        if (!bodyA || !bodyB) return;
+        
+        // Handle player landing on platform
+        if ((bodyA.label === 'player' && PLATFORM_TYPES.includes(bodyB.label)) ||
+            (PLATFORM_TYPES.includes(bodyA.label) && bodyB.label === 'player')) {
+          // ... existing code ...
         }
         
-        // Handle spike collision
-        if ((bodyA.label === 'player' && bodyB.label === 'spike') ||
-            (bodyA.label === 'spike' && bodyB.label === 'player')) {
-          const playerBody = bodyA.label === 'player' ? bodyA : bodyB;
-          const spikeBody = bodyA.label === 'spike' ? bodyA : bodyB;
-          
-          // Check if within cooling time
-          const currentTime = Date.now();
-          if (currentTime - lastDamageTime < 1000) {
-            return;
-          }
-          
-          // Update last damage time
-          setLastDamageTime(currentTime);
-          
-          // Reduce lives
-          setLives((prev) => {
-            const newLives = Math.max(0, prev - 2);
-            if (newLives <= 0 && !gameOver) {
-              setGameOver(true);
-              Alert.alert(
-                "Game Over",
-                `You lost, welcome to hell! Your score: ${score}`,
-                [
-                  { text: "Return to Main Menu", onPress: () => navigation.navigate('MainScreen') }
-                ]
-              );
-            }
-            return newLives;
-          });
-          
-          // Completely stop player movement and force set on spike
-          Matter.Body.setVelocity(playerBody, { x: 0, y: 0 });
-          Matter.Body.setAngularVelocity(playerBody, 0);
-          
-          // Precisely place player on spike
-          Matter.Body.setPosition(playerBody, {
-            x: playerBody.position.x,
-            y: spikeBody.position.y - (spikeBody.bounds.max.y - spikeBody.bounds.min.y) / 2 - 
-               (playerBody.bounds.max.y - playerBody.bounds.min.y) / 2 + 2 // More precise positioning
-          });
-          
-          // Increase player mass to make him more stable and reduce elasticity
-          const originalMass = playerBody.mass;
-          Matter.Body.setMass(playerBody, originalMass * 5);
-          playerBody.restitution = 0;  // Remove elasticity
-          playerBody.friction = 1.0;   // Maximum friction
-          
-          // Set a flag to prevent continuous damage
-          playerBody.isTouchingSpike = true;
-          playerBody.currentSpike = spikeBody; // Record current spike
-          
-          // Add special handling function to prevent bounce
-          const preventBounce = () => {
-            if (playerBody && playerBody.isTouchingSpike) {
-              Matter.Body.setVelocity(playerBody, { x: 0, y: 0 });
-              
-              // Ensure player stays on spike
-              if (playerBody.currentSpike) {
-                const spikeTop = playerBody.currentSpike.bounds.min.y;
-                const playerHeight = playerBody.bounds.max.y - playerBody.bounds.min.y;
-                
-                Matter.Body.setPosition(playerBody, {
-                  x: playerBody.position.x,
-                  y: spikeTop - playerHeight/2
-                });
-              }
-            }
-          };
-          
-          // Create bounce detection interval
-          const bounceInterval = setInterval(preventBounce, 16);
-          
-          // 3 seconds later restore physical properties but keep player on spike
-          setTimeout(() => {
-            if (playerBody) {
-              // Stop bounce detection
-              clearInterval(bounceInterval);
-              
-              // Restore original mass and physical properties but stay on spike
-              Matter.Body.setMass(playerBody, originalMass);
-              playerBody.restitution = 0;  // Keep non-elastic
-              
-              // Allow player to move slightly but initial speed still 0
-              Matter.Body.setVelocity(playerBody, { x: 0, y: 0 });
-            }
-          }, 3000);
+        // Handle fireball collision with player
+        if ((bodyA.label === 'player' && bodyB.label === 'fireball') ||
+            (bodyA.label === 'fireball' && bodyB.label === 'player')) {
+          // No longer handle Matter.js fireball collisions since we use custom system
+          console.log('Matter.js fireball collision deprecated, using custom system');
+          return;
         }
         
-        // Handle boundary collision
-        if (bodyA.label === 'player' || bodyB.label === 'player') {
-          const playerBody = bodyA.label === 'player' ? bodyA : bodyB;
-          const otherBody = bodyA.label === 'player' ? bodyB : bodyA;
-          
-          // Handle top boundary collision
-          if (otherBody.label === 'topBoundary') {
-            // Check if within cooling time
-            const currentTime = Date.now();
-            if (currentTime - lastDamageTime < 1000) {
-              return;
-            }
-            
-            // Update last damage time
-            setLastDamageTime(currentTime);
-            
-            // Reduce lives (losing 1 life when hitting top boundary)
-            setLives((prev) => {
-              const newLives = Math.max(0, prev - 1);
-              if (newLives <= 0 && !gameOver) {
-                setGameOver(true);
-                Alert.alert(
-                  "Game Over",
-                  `You lost, welcome to hell! Your score: ${score}`,
-                  [
-                    { text: "Return to Main Menu", onPress: () => navigation.navigate('MainScreen') }
-                  ]
-                );
-              }
-              return newLives;
-            });
-            
-            // Push player down but not too strongly
-            Matter.Body.setVelocity(playerBody, {
-              x: playerBody.velocity.x,
-              y: 5 // Mildly push down
-            });
-          }
-          
-          // Handle left and right boundary collisions
-          if (otherBody.label === 'leftBoundary' || otherBody.label === 'rightBoundary') {
-            // Push player towards center, reduce bounce
-            const pushDirection = playerBody.position.x > width / 2 ? -1 : 1;
-            
-            Matter.Body.setVelocity(playerBody, {
-              x: pushDirection,
-              y: playerBody.velocity.y
-            });
-            
-            // Check if within cooling time
-            const currentTime = Date.now();
-            if (currentTime - lastDamageTime < 1000) {
-              return;
-            }
-            
-            // Update last damage time
-            setLastDamageTime(currentTime);
-            
-            // Reduce lives (losing 1 life when hitting boundary)
-            setLives((prev) => {
-              const newLives = Math.max(0, prev - 1);
-              if (newLives <= 0 && !gameOver) {
-                setGameOver(true);
-                Alert.alert(
-                  "Game Over",
-                  `You lost, welcome to hell! Your score: ${score}`,
-                  [
-                    { text: "Return to Main Menu", onPress: () => navigation.navigate('MainScreen') }
-                  ]
-                );
-              }
-              return newLives;
-            });
-          }
-        }
-
-        // Handle spring collision
-        if ((bodyA.label === 'player' && bodyB.label === 'spring') ||
-            (bodyA.label === 'spring' && bodyB.label === 'player')) {
-          const playerBody = bodyA.label === 'player' ? bodyA : bodyB;
-          const springBody = bodyA.label === 'spring' ? bodyA : bodyB;
-          
-          console.log('Player collision with spring started!');
-          
-          // Check if player is truly colliding with spring (not just passing by)
-          const springTop = springBody.bounds.min.y;
-          const playerBottom = playerBody.bounds.max.y;
-          const playerHeight = playerBody.bounds.max.y - playerBody.bounds.min.y;
-          
-          // Calculate horizontal overlap to ensure player is really on the spring
-          const springWidth = springBody.bounds.max.x - springBody.bounds.min.x;
-          const springLeft = springBody.bounds.min.x;
-          const springRight = springBody.bounds.max.x;
-          const playerWidth = playerBody.bounds.max.x - playerBody.bounds.min.x;
-          const playerLeft = playerBody.position.x - playerWidth / 2;
-          const playerRight = playerBody.position.x + playerWidth / 2;
-          
-          // Calculate overlap
-          const overlapLeft = Math.max(playerLeft, springLeft);
-          const overlapRight = Math.min(playerRight, springRight);
-          const overlapWidth = Math.max(0, overlapRight - overlapLeft);
-          const overlapRatio = overlapWidth / playerWidth;
-          
-          // Only trigger spring if player is actually on top of it with sufficient overlap
-          const verticalDistance = Math.abs(playerBottom - springTop);
-          if (verticalDistance <= 10 && overlapRatio >= 0.3 && playerBody.velocity.y >= 0) {
-            // Position player precisely on top of spring to prevent penetration
-            Matter.Body.setPosition(playerBody, {
-              x: playerBody.position.x,
-              y: springTop - playerHeight/2 - 1 // 1 pixel above spring surface
-            });
-            
-            // Gentler upward bounce with lower velocity
-            Matter.Body.setVelocity(playerBody, {
-              x: playerBody.velocity.x * 0.9, // Maintain most horizontal momentum
-              y: -10  // Reduced from -15 to -10 for gentler bounce
-            });
-            
-            // Apply weaker upward force
-            Matter.Body.applyForce(playerBody, playerBody.position, {
-              x: 0,
-              y: -0.01 // Reduced from -0.03 to -0.01 for gentler effect
-            });
-            
-            // Increase lives if below 10 (no cooldown for spring healing)
-            if (lives < 10) {
-              setLives(prev => Math.min(prev + 1, 10));
-              console.log('Healed 1 life from spring jump!');
-            }
-            
-            // Set player properties for better spring effect
-            playerBody.restitution = 0.1;  // Further reduced from 0.3 to 0.1 for minimal bounce
-            
-            console.log(`Spring applied velocity: ${JSON.stringify(playerBody.velocity)}`);
-          } else {
-            console.log('Spring collision detected but not actually on top - no bounce applied');
-          }
+        // Handle fireball collision with platforms
+        if ((bodyA.label === 'fireball' && 
+             (bodyB.label === 'platform' || bodyB.label === 'spring' || bodyB.label === 'treadmill' || bodyB.label === 'spike')) ||
+            ((bodyA.label === 'platform' || bodyA.label === 'spring' || bodyA.label === 'treadmill' || bodyA.label === 'spike') && 
+             bodyB.label === 'fireball')) {
+          // No longer handle Matter.js fireball collisions since we use custom system
+          console.log('Matter.js fireball-platform collision deprecated, using custom system');
+          return;
         }
       });
     };
@@ -788,69 +730,6 @@ export default function GameScreen({ route, navigation }) {
     });
   };
 
-  // Create head decoration
-  useEffect(() => {
-    if (!entities || !entities.physics) return;
-    
-    const world = entities.physics.world;
-    const headRadius = 20;
-    const headOffset = 40;  // Distance from boundary to head
-    
-    // Left head - Ensure fully fixed
-    const leftHead = Matter.Bodies.circle(
-      headOffset, 
-      height / 2, 
-      headRadius, 
-      { 
-        isStatic: true, 
-        isSensor: true,
-        label: 'leftHead',
-        render: { fillStyle: '#ff0000' },
-        collisionFilter: { group: 0 }  // Use collision group to ensure unaffected
-      }
-    );
-    
-    // Right head - Ensure fully fixed
-    const rightHead = Matter.Bodies.circle(
-      width - headOffset, 
-      height / 2, 
-      headRadius, 
-      { 
-        isStatic: true, 
-        isSensor: true,
-        label: 'rightHead',
-        render: { fillStyle: '#ff0000' },
-        collisionFilter: { group: 0 }  // Use collision group to ensure unaffected
-      }
-    );
-    
-    // Ensure head stays in fixed position, set as permanent static
-    Matter.Body.setStatic(leftHead, true);
-    Matter.Body.setStatic(rightHead, true);
-    
-    Matter.World.add(world, [leftHead, rightHead]);
-    
-    // Update entities
-    setEntities(prevEntities => ({
-      ...prevEntities,
-      leftHead: { 
-        body: leftHead, 
-        size: [headRadius*2, headRadius*2], 
-        color: 'red', 
-        renderer: 'circle',
-        isStatic: true  // Explicitly mark as static
-      },
-      rightHead: { 
-        body: rightHead, 
-        size: [headRadius*2, headRadius*2], 
-        color: 'red', 
-        renderer: 'circle',
-        isStatic: true  // Explicitly mark as static
-      }
-    }));
-    
-  }, [entities?.physics]);
-  
   // Add fireball
   useEffect(() => {
     if (!entities || !entities.physics) return;
@@ -947,6 +826,8 @@ export default function GameScreen({ route, navigation }) {
       source={require('../../assets/img/Bg2.png')}
       style={styles.background}
     >
+      {/* 不再需要額外的Devil Horns UI元素，因為現在邊界已經使用了Devil Head圖像 */}
+      
       <GameEngine 
         ref={gameEngineRef}
         style={styles.gameContainer}
@@ -956,7 +837,7 @@ export default function GameScreen({ route, navigation }) {
       >
         <View style={styles.statsContainer}>
           <View style={styles.statsLeft}>
-        <Text style={styles.livesText}>Lives: {lives}</Text>
+            <Text style={styles.livesText}>Lives: {lives}</Text>
             <Text style={styles.scoreText}>Score: {score}</Text>
           </View>
           <TouchableOpacity style={styles.pauseButton} onPress={togglePause}>
