@@ -1,18 +1,22 @@
-# Mobile Game Project - Stable Version
+# NS-Shaft: Welcome to Hell
 
-This is the stable version of a mobile game project, preserved from the 22:11 commit. It features a vertically scrolling platform game with various gameplay elements.
+This is a stable version of our NS-Shaft inspired mobile game project, preserved from the 22:11 commit. It features a vertically scrolling platform game with various gameplay elements set in a hellish theme.
+
+## Game Concept
+
+NS-Shaft: Welcome to Hell is based on the classic NS-Shaft game concept, where players must navigate downward through a series of platforms while avoiding hazards. In our version, the player descends through the layers of hell, facing increasingly challenging obstacles.
 
 ## Game Features
 
-- **Dynamic Platforming**: Navigate through an endless series of platforms that scroll vertically
+- **Dynamic Platforming**: Navigate through an endless series of hellish platforms that scroll vertically
 - **Multiple Platform Types**:
-  - Regular platforms
-  - Springs that bounce the player higher
-  - Treadmills that move the player horizontally
-  - Spikes that damage the player
-- **Health System**: Player has 10 lives that can be lost through various hazards
+  - Regular platforms that provide sanctuary
+  - Demonic springs that bounce the player higher
+  - Hellish treadmills that move the player horizontally
+  - Fiery spikes that damage the player
+- **Health System**: Player has 10 lives that can be lost through various infernal hazards
 - **Falling Fireballs**: Dodge fireballs that fall from the top of the screen
-- **Score System**: Earn points based on survival time
+- **Score System**: Earn points based on survival time in hell
 - **Responsive Controls**: Move left and right with on-screen buttons
 
 ## Technical Details
@@ -25,10 +29,10 @@ This is the stable version of a mobile game project, preserved from the 22:11 co
 ## Controls
 
 - Left and right buttons control horizontal movement
-- Landing on springs causes the player to bounce higher
-- Regular platforms provide healing
-- Spikes cause damage
-- Treadmills move the player in their direction
+- Landing on springs causes the player to bounce higher (with healing effect)
+- Regular platforms provide healing (brief sanctuary)
+- Spikes cause damage (hellish punishment)
+- Treadmills move the player in their direction (the unstable nature of hell)
 
 ## Setup Instructions
 
@@ -40,14 +44,23 @@ This is the stable version of a mobile game project, preserved from the 22:11 co
 
 This is the stable version from the 22:11 commit, which includes the following improvements:
 - Slow bounce on springs with healing
-- Healing on platforms
-- Damage on spikes
+- Healing on platforms (sanctuary effect)
+- Damage on spikes (increased challenge)
 - Fixed boundary detection
 - Increased platform gaps for better gameplay
 
+## Visual Theme
+
+The game features a dark, fiery aesthetic with:
+- Hellish background with flames
+- Demonic imagery
+- Red and black color scheme
+- Infernal obstacles
+
 ## Credits
 
-- Original game concept and implementation by the Mobile Game Development Team
+- Inspired by the classic NS-Shaft game
+- Original "Welcome to Hell" concept and implementation by the Mobile Game Development Team
 - Physics engine: Matter.js
 - Game engine: React Native Game Engine
 
